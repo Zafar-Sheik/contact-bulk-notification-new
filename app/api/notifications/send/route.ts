@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
-import Device from '@/lib/db/models/Device';
-import Notification from '@/lib/models/notification.model';
+import { Device, Notification } from '@/lib/models';
 import { sendNotificationToAllDevices } from '@/lib/firebase/messaging';
 import { 
   checkRateLimit, 
@@ -82,7 +81,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const tokens = devices.map(d => d.fcmToken).filter(Boolean);
+    const tokens = devices.map((d: { fcmToken: string }) => d.fcmToken).filter(Boolean);
 
     if (tokens.length === 0) {
       return NextResponse.json(
@@ -108,7 +107,7 @@ export async function POST(request: NextRequest) {
       link: link?.trim() || '',
       sentByAdmin: adminSession.adminId,
       sentAt: new Date(),
-      status: result.failed > 0 ? 'failed' : 'sent',
+      status: result.success > 0 ? 'sent' : 'failed',
       sentCount: result.success,
     });
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
-import Device from '@/lib/db/models/Device';
+import { Device } from '@/lib/models';
 import { parseUserAgent } from '@/lib/utils/helpers';
 import type { DeviceRegistrationBody } from '@/types';
 
