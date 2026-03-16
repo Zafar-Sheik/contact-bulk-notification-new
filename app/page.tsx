@@ -1,65 +1,331 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import { useEffect, useState } from 'react';
+import { usePWA } from '@/components/pwa/firebase-provider';
+import NotificationCard from '@/components/ui/NotificationCard';
+import NotificationModal from '@/components/ui/NotificationModal';
+
+interface Notification {
+  _id: string;
+  title: string;
+  message: string;
+  image?: string;
+  sentAt?: string;
+  createdAt?: string;
+}
+
+export default function HomePage() {
+  const { 
+    isReady, 
+    isSupported, 
+    permission, 
+    token, 
+    isRegistering, 
+    error,
+    registerDevice 
+  } = usePWA();
+
+  const [isInstalled, setIsInstalled] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<Event | null>(null);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
+  const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  useEffect(() => {
+    // Check if app is already installed
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setIsInstalled(true);
+    }
+
+    // Listen for install prompt
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  // Fetch notifications
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      setIsLoadingNotifications(true);
+      try {
+        const response = await fetch('/api/notifications?limit=3');
+        const data = await response.json();
+        if (data.success && data.notifications) {
+          setNotifications(data.notifications);
+        }
+      } catch (error) {
+        console.error('Failed to fetch notifications:', error);
+      } finally {
+        setIsLoadingNotifications(false);
+      }
+    };
+
+    fetchNotifications();
+  }, []);
+
+  const handleNotificationClick = (notification: Notification) => {
+    setSelectedNotification(notification);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedNotification(null);
+  };
+
+  const handleInstall = async () => {
+    if (!deferredPrompt) return;
+    
+    (deferredPrompt as unknown as { prompt: () => void }).prompt();
+    const { outcome } = await (deferredPrompt as unknown as { userChoice: Promise<{ outcome: string }> }).userChoice;
+    
+    if (outcome === 'accepted') {
+      setIsInstalled(true);
+    }
+    setDeferredPrompt(null);
+  };
+
+  const handleEnableNotifications = async () => {
+    await registerDevice();
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      <div className="container mx-auto px-4 py-16">
+        <div className="max-w-2xl mx-auto">
+          {/* Header */}
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-blue-600 rounded-full mb-6">
+              <svg 
+                className="w-10 h-10 text-white" 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  strokeWidth={2} 
+                  d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" 
+                />
+              </svg>
+            </div>
+            <h1 className="text-4xl font-bold text-gray-900 mb-4">
+              Push Notifications
+            </h1>
+            <p className="text-xl text-gray-600">
+              Stay connected and receive important updates instantly
+            </p>
+          </div>
+
+          {/* Status Card */}
+          <div className="bg-white rounded-2xl shadow-xl p-8 mb-8">
+            <h2 className="text-2xl font-semibold text-gray-900 mb-6">
+              Your Status
+            </h2>
+
+            <div className="space-y-4">
+              {/* Support Status */}
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <span className="text-gray-700">Browser Support</span>
+                <span className={`px-4 py-2 rounded-full text-sm font-medium ${
+                  isSupported 
+                    ? 'bg-green-100 text-green-800' 
+                    : 'bg-red-100 text-red-800'
+                }`}>
+                  {isSupported ? 'Supported' : 'Not Supported'}
+                </span>
+              </div>
+
+              {/* Permission Status */}
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <span className="text-gray-700">Notification Permission</span>
+                <span className={`px-4 py-2 rounded-full text-sm font-medium ${
+                  permission === 'granted' 
+                    ? 'bg-green-100 text-green-800' 
+                    : permission === 'denied'
+                    ? 'bg-red-100 text-red-800'
+                    : 'bg-yellow-100 text-yellow-800'
+                }`}>
+                  {permission === 'unsupported' 
+                    ? 'N/A' 
+                    : permission.charAt(0).toUpperCase() + permission.slice(1)}
+                </span>
+              </div>
+
+              {/* Registration Status */}
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <span className="text-gray-700">Device Registration</span>
+                <span className={`px-4 py-2 rounded-full text-sm font-medium ${
+                  token 
+                    ? 'bg-green-100 text-green-800' 
+                    : 'bg-gray-100 text-gray-800'
+                }`}>
+                  {token ? 'Registered' : 'Not Registered'}
+                </span>
+              </div>
+
+              {/* Install Status */}
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <span className="text-gray-700">App Installed</span>
+                <span className={`px-4 py-2 rounded-full text-sm font-medium ${
+                  isInstalled 
+                    ? 'bg-green-100 text-green-800' 
+                    : 'bg-gray-100 text-gray-800'
+                }`}>
+                  {isInstalled ? 'Yes' : 'No'}
+                </span>
+              </div>
+            </div>
+
+            {/* Error Message */}
+            {error && (
+              <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-red-700">{error}</p>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="mt-8 space-y-4">
+              {!token && isSupported && (
+                <button
+                  onClick={handleEnableNotifications}
+                  disabled={isRegistering}
+                  className="w-full py-4 px-6 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-3"
+                >
+                  {isRegistering ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Enabling Notifications...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                      </svg>
+                      Enable Notifications
+                    </>
+                  )}
+                </button>
+              )}
+
+              {token && (
+                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-green-800 font-medium">
+                    ✓ You're all set! You'll receive push notifications.
+                  </p>
+                </div>
+              )}
+
+              {!isInstalled && deferredPrompt && (
+                <button
+                  onClick={handleInstall}
+                  className="w-full py-4 px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-3"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Install App
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Notifications Section */}
+          {(notifications.length > 0 || isLoadingNotifications) && (
+            <div className="mb-8">
+              <div className="flex items-center gap-2 mb-6">
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                </div>
+                <h2 className="text-2xl font-semibold text-gray-900">
+                  Recent Notifications
+                </h2>
+              </div>
+
+              {isLoadingNotifications ? (
+                <div className="grid md:grid-cols-3 gap-4">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="bg-white rounded-2xl shadow-lg p-5 animate-pulse">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="w-10 h-10 bg-gray-200 rounded-xl" />
+                        <div className="h-4 w-16 bg-gray-200 rounded-full" />
+                      </div>
+                      <div className="h-5 bg-gray-200 rounded w-3/4 mb-2" />
+                      <div className="h-4 bg-gray-200 rounded w-full mb-1" />
+                      <div className="h-4 bg-gray-200 rounded w-2/3" />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-3 gap-4">
+                  {notifications.map((notification, index) => (
+                    <NotificationCard
+                      key={notification._id}
+                      notification={notification}
+                      index={index}
+                      onClick={() => handleNotificationClick(notification)}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Features */}
+          <div className="grid md:grid-cols-3 gap-6">
+            <div className="bg-white/80 backdrop-blur rounded-xl p-6 shadow-lg">
+              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
+                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Instant Updates</h3>
+              <p className="text-gray-600">Receive notifications instantly as soon as they're sent</p>
+            </div>
+
+            <div className="bg-white/80 backdrop-blur rounded-xl p-6 shadow-lg">
+              <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center mb-4">
+                <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Works Everywhere</h3>
+              <p className="text-gray-600">Works on mobile, tablet, and desktop browsers</p>
+            </div>
+
+            <div className="bg-white/80 backdrop-blur rounded-xl p-6 shadow-lg">
+              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
+                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Secure & Private</h3>
+              <p className="text-gray-600">Your data is protected with industry-standard security</p>
+            </div>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+      </div>
+
+      {/* Notification Modal */}
+      <NotificationModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        notification={selectedNotification}
+      />
+    </main>
   );
 }
