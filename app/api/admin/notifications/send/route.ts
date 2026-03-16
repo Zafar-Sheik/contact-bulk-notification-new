@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const tokens = devices.map(d => d.fcmToken);
+    const tokens = devices.map((d: { fcmToken: string }) => d.fcmToken);
     console.log('FCM tokens:', tokens.length);
 
     // Send notifications
@@ -116,11 +116,13 @@ export async function POST(request: NextRequest) {
     // Clean up invalid tokens
     if (result.errors && result.errors.length > 0) {
       const invalidTokens = result.errors
-        .filter(e => e.error.includes('NOT_FOUND') || e.error.includes('Invalid'))
+        .filter(e => e.error.includes('NOT_FOUND') || e.error.includes('NotRegistered') || e.error.includes('Invalid'))
         .map(e => tokens[e.index]);
       
+      console.log('Cleaning up', invalidTokens.length, 'invalid tokens');
       if (invalidTokens.length > 0) {
         await Device.deleteMany({ fcmToken: { $in: invalidTokens } });
+        console.log('Removed', invalidTokens.length, 'invalid devices from database');
       }
     }
 

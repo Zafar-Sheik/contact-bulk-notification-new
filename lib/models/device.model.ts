@@ -1,12 +1,16 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
+/**
+ * Device Interface - Unified model for device registration and notification sending
+ */
 export interface IDevice extends Document {
   fcmToken: string;
-  platform: 'android' | 'ios' | 'windows' | 'mac' | 'linux' | 'unknown';
-  browser: string;
-  os: string;
-  lastSeen: Date;
-  createdAt: Date;
+  deviceInfo: {
+    platform: 'android' | 'ios' | 'windows' | 'mac' | 'linux' | 'unknown';
+    browser: string;
+    userAgent: string;
+    language: string;
+  };
   metadata: {
     isActive: boolean;
     lastSeen: Date;
@@ -22,6 +26,8 @@ export interface IDevice extends Document {
     receivedAt: Date;
     read: boolean;
   }>;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 const DeviceSchema = new Schema<IDevice>(
@@ -31,28 +37,25 @@ const DeviceSchema = new Schema<IDevice>(
       required: [true, 'FCM token is required'],
       unique: true,
       index: true,
-      trim: true,
     },
-    platform: {
-      type: String,
-      enum: ['android', 'ios', 'windows', 'mac', 'linux', 'unknown'],
-      default: 'unknown',
-      required: true,
-    },
-    browser: {
-      type: String,
-      default: 'unknown',
-      trim: true,
-    },
-    os: {
-      type: String,
-      default: '',
-      trim: true,
-    },
-    lastSeen: {
-      type: Date,
-      default: Date.now,
-      required: true,
+    deviceInfo: {
+      platform: {
+        type: String,
+        enum: ['android', 'ios', 'windows', 'mac', 'linux', 'unknown'],
+        default: 'unknown',
+      },
+      browser: {
+        type: String,
+        default: 'unknown',
+      },
+      userAgent: {
+        type: String,
+        default: '',
+      },
+      language: {
+        type: String,
+        default: 'en',
+      },
     },
     metadata: {
       isActive: {
@@ -85,25 +88,26 @@ const DeviceSchema = new Schema<IDevice>(
     },
   },
   {
-    timestamps: { createdAt: true, updatedAt: false },
+    timestamps: true,
   }
 );
 
-// Compound indexes for efficient queries
-DeviceSchema.index({ platform: 1, createdAt: -1 });
-DeviceSchema.index({ lastSeen: -1 });
-DeviceSchema.index({ createdAt: -1 });
+// Indexes for efficient queries
+DeviceSchema.index({ 'deviceInfo.platform': 1 });
+DeviceSchema.index({ 'deviceInfo.browser': 1 });
 DeviceSchema.index({ 'metadata.isActive': 1 });
 DeviceSchema.index({ 'metadata.lastSeen': -1 });
-DeviceSchema.index({ 'receivedNotifications.receivedAt': -1 });
+DeviceSchema.index({ fcmToken: 1 });
 
 // Update lastSeen before save
 DeviceSchema.pre('save', function (next) {
-  this.lastSeen = new Date();
+  if (this.isModified()) {
+    this.metadata.lastSeen = new Date();
+  }
   next();
 });
 
 // Prevent model overwrite in development
-export const Device = mongoose.models.Device || mongoose.model<IDevice>('Device', DeviceSchema);
+const Device = mongoose.models.Device || mongoose.model<IDevice>('Device', DeviceSchema);
 
 export default Device;

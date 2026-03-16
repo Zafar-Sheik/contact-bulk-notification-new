@@ -58,7 +58,7 @@ export async function sendPushNotification(
             });
             
             // Handle invalid tokens - mark for removal
-            if (errorMsg.includes('NOT_FOUND') || errorMsg.includes('Invalid')) {
+            if (errorMsg.includes('NOT_FOUND') || errorMsg.includes('NotRegistered') || errorMsg.includes('Invalid')) {
               console.log('FCM: Invalid token detected at index', i + idx);
             }
           }
