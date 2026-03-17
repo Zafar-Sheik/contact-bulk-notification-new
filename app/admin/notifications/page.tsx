@@ -28,9 +28,12 @@ export default function NotificationsPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
 
   useEffect(() => {
     fetchNotifications();
@@ -54,6 +57,33 @@ export default function NotificationsPage() {
       console.error('Error fetching notifications:', err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const clearHistory = async () => {
+    setIsClearing(true);
+    setError('');
+    try {
+      const response = await fetch('/api/admin/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clearAll: true }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSuccess(`Cleared ${data.deletedCount} notifications`);
+        setNotifications([]);
+        setStats({ total: 0, sent: 0, failed: 0, scheduled: 0, pending: 0 });
+        setShowClearConfirm(false);
+      } else {
+        throw new Error('Failed to clear notifications');
+      }
+    } catch (err) {
+      setError('Failed to clear notifications. Please try again.');
+      console.error('Error clearing notifications:', err);
+    } finally {
+      setIsClearing(false);
     }
   };
 
@@ -86,6 +116,17 @@ export default function NotificationsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Notification History</h1>
           <p className="text-gray-500 mt-1">View all sent and scheduled notifications</p>
         </div>
+        {notifications.length > 0 && (
+          <button
+            onClick={() => setShowClearConfirm(true)}
+            className="px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 transition-colors flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            Clear History
+          </button>
+        )}
       </div>
 
       {/* Stats Cards */}
@@ -175,6 +216,56 @@ export default function NotificationsPage() {
             >
               Try again
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Success Message */}
+      {success && (
+        <div className="p-4 bg-green-50 border border-green-100 rounded-xl">
+          <div className="flex items-center gap-3">
+            <svg className="w-5 h-5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p className="text-green-700">{success}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Clear History Confirmation Dialog */}
+      {showClearConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Clear Notification History?</h3>
+            <p className="text-gray-600 mb-6">
+              This will permanently delete all notification history. This action cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowClearConfirm(false)}
+                disabled={isClearing}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={clearHistory}
+                disabled={isClearing}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+              >
+                {isClearing ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Clearing...
+                  </>
+                ) : (
+                  'Clear All'
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
 import { Notification } from '@/lib/models';
-import { requireAuth } from '@/lib/auth/admin';
+import { requireAdmin } from '@/lib/auth/admin';
 
 export async function GET(request: NextRequest) {
   try {
@@ -84,6 +84,60 @@ export async function GET(request: NextRequest) {
     
     return NextResponse.json(
       { error: 'Failed to fetch notifications' },
+      { status: 500 }
+    );
+  }
+}
+
+async function requireAuth() {
+  const { requireAdmin } = await import('@/lib/auth/admin');
+  return requireAdmin();
+}
+
+/**
+ * POST /api/admin/notifications
+ * Clear all notification history
+ */
+export async function POST(request: NextRequest) {
+  try {
+    // Verify admin authentication
+    await requireAuth();
+
+    // Connect to database
+    await connectDB();
+
+    // Parse the request body
+    const body = await request.json();
+    const { clearAll } = body;
+
+    if (clearAll) {
+      // Delete all notifications
+      const result = await Notification.deleteMany({});
+      
+      return NextResponse.json({
+        success: true,
+        message: `Deleted ${result.deletedCount} notifications`,
+        deletedCount: result.deletedCount,
+      });
+    }
+
+    // If clearAll is not true, return error
+    return NextResponse.json(
+      { error: 'Invalid request. Set clearAll to true to clear history.' },
+      { status: 400 }
+    );
+  } catch (error) {
+    console.error('Clear notifications error:', error);
+    
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+    
+    return NextResponse.json(
+      { error: 'Failed to clear notifications' },
       { status: 500 }
     );
   }
