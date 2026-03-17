@@ -11,7 +11,7 @@ interface DeviceStats {
 export default function AdminDashboard() {
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
+  const [imageData, setImageData] = useState('');
   const [link, setLink] = useState('');
   const [scheduledAt, setScheduledAt] = useState('');
   const [isScheduled, setIsScheduled] = useState(false);
@@ -76,7 +76,7 @@ export default function AdminDashboard() {
         throw new Error(data.error || 'Failed to upload file');
       }
 
-      setImageUrl(data.url);
+      setImageData(data.imageData);
       setSuccess('Image uploaded successfully!');
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
@@ -99,7 +99,7 @@ export default function AdminDashboard() {
       const payload = {
         title: title.trim(),
         message: message.trim(),
-        imageUrl: imageUrl.trim() || undefined,
+        imageUrl: imageData.trim() || undefined,
         link: link.trim() || undefined,
       };
 
@@ -122,7 +122,7 @@ export default function AdminDashboard() {
       // Reset form
       setTitle('');
       setMessage('');
-      setImageUrl('');
+      setImageData('');
       setLink('');
       setScheduledAt('');
       setIsScheduled(false);
@@ -147,7 +147,7 @@ export default function AdminDashboard() {
   };
 
   const removeImage = () => {
-    setImageUrl('');
+    setImageData('');
     setSuccess('');
   };
 
@@ -282,10 +282,10 @@ export default function AdminDashboard() {
             </label>
             
             {/* Image Preview */}
-            {imageUrl && (
+            {imageData && (
               <div className="mb-4 relative inline-block">
                 <img
-                  src={imageUrl}
+                  src={imageData}
                   alt="Preview"
                   className="max-w-xs max-h-40 rounded-xl border border-gray-200 object-cover"
                 />
@@ -343,8 +343,8 @@ export default function AdminDashboard() {
                 <input
                   id="imageUrl"
                   type="url"
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
+                  value={imageData}
+                  onChange={(e) => setImageData(e.target.value)}
                   className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
                   placeholder="https://example.com/image.jpg"
                 />

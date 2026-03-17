@@ -99,11 +99,14 @@ export async function POST(request: NextRequest) {
       link?.trim() || undefined
     );
 
+    // Save the full base64 image to database (after compression it's small enough)
+    const imageForDb = imageUrl?.trim() || '';
+
     // Save notification to database
     const notification = new Notification({
       title: title.trim(),
       message: message.trim(),
-      imageUrl: imageUrl?.trim() || '',
+      imageUrl: imageForDb,
       link: link?.trim() || '',
       sentByAdmin: adminSession.adminId,
       sentAt: new Date(),

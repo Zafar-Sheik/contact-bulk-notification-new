@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import { existsSync } from 'fs';
-import path from 'path';
 import { 
   checkRateLimit, 
   RATE_LIMITS, 
   validateFileType,
-  sanitizeFilename,
   sanitizeError 
 } from '@/lib/utils/security';
+
+// Dynamic import for sharp to handle edge cases
+let sharp: any = null;
+async function getSharp() {
+  if (!sharp) {
+    sharp = (await import('sharp')).default;
+  }
+  return sharp;
+}
 
 // Allowed file types for images
 const ALLOWED_TYPES = [
@@ -81,38 +86,48 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Sanitize filename to prevent directory traversal
-    const sanitizedName = sanitizeFilename(file.name);
-    
-    // Get file extension
-    const extension = sanitizedName.split('.').pop()?.toLowerCase() || 'jpg';
-    
-    // Generate unique filename with timestamp
-    const timestamp = Date.now();
-    const randomSuffix = Math.random().toString(36).substring(2, 8);
-    const filename = `notification_${timestamp}_${randomSuffix}.${extension}`;
-
-    // Ensure uploads directory exists
-    const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
-    if (!existsSync(uploadsDir)) {
-      await mkdir(uploadsDir, { recursive: true });
-    }
-
-    // Convert file to buffer and save
+    // Convert file to buffer
     const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    const filePath = path.join(uploadsDir, filename);
-    await writeFile(filePath, buffer);
-
-    // Return the public URL
-    const imageUrl = `/uploads/${filename}`;
+    const inputBuffer = Buffer.from(bytes);
+    
+    // Try to compress and resize image
+    let compressedBuffer: Buffer;
+    let mimeType = 'image/jpeg';
+    
+    try {
+      const sharpModule = await getSharp();
+      if (sharpModule) {
+        // Compress to very small size for FCM (max 50KB total payload)
+        compressedBuffer = await sharpModule(inputBuffer)
+          .resize(100, 100, {
+            fit: 'inside',
+            withoutEnlargement: true,
+          })
+          .jpeg({ quality: 50 })
+          .toBuffer();
+      } else {
+        // Fallback: no compression
+        compressedBuffer = inputBuffer;
+        mimeType = file.type;
+      }
+    } catch (compressionError) {
+      console.error('Compression failed, using original:', compressionError);
+      // Fallback: use original buffer
+      compressedBuffer = inputBuffer;
+      mimeType = file.type;
+    }
+    
+    const base64 = compressedBuffer.toString('base64');
+    
+    // Create data URL for the image
+    const imageDataUrl = `data:${mimeType};base64,${base64}`;
 
     return NextResponse.json({
       success: true,
-      url: imageUrl,
-      filename: filename,
-      size: file.size,
-      type: file.type,
+      imageData: imageDataUrl,
+      base64: base64,
+      mimeType: mimeType,
+      size: compressedBuffer.length,
     });
   } catch (error) {
     console.error('Upload error:', error);
