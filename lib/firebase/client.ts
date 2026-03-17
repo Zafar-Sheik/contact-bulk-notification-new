@@ -131,9 +131,33 @@ export function isNotificationsSupported(): boolean {
 /**
  * Request notification permission from user
  * 
- * @returns Permission status
+ * @returns Permission status: 'granted' | 'denied' | 'default'
  */
-export async function requestNotificationPermission(): Promise<string | null> {
+export async function requestNotificationPermission(): Promise<NotificationPermission> {
+  if (typeof window === 'undefined') {
+    return 'denied';
+  }
+
+  if (!('Notification' in window)) {
+    return 'denied';
+  }
+
+  try {
+    // Request permission from the browser
+    const permission = await Notification.requestPermission();
+    return permission;
+  } catch (error) {
+    console.error('Error requesting notification permission:', error);
+    return 'denied';
+  }
+}
+
+/**
+ * Get FCM token for push notifications
+ * 
+ * @returns FCM token or null if not available
+ */
+export async function getFcmToken(): Promise<string | null> {
   if (typeof window === 'undefined') {
     return null;
   }

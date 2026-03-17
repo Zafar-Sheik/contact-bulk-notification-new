@@ -3,7 +3,8 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { 
   initFirebase, 
-  requestNotificationPermission, 
+  requestNotificationPermission,
+  getFcmToken,
   onForegroundMessage,
   isNotificationsSupported,
   getNotificationPermission
@@ -64,7 +65,7 @@ export function PWAProvider({ children }: PWAProviderProps) {
       if (permission === 'granted' && !token) {
         try {
           setIsRegistering(true);
-          const fcmToken = await requestNotificationPermission();
+          const fcmToken = await getFcmToken();
           
           if (fcmToken) {
             setToken(fcmToken);
@@ -114,22 +115,18 @@ export function PWAProvider({ children }: PWAProviderProps) {
     setError(null);
 
     try {
-      // Request permission
-      const currentPermission = getNotificationPermission();
+      // Request permission from browser
+      const permission = await requestNotificationPermission();
+      setPermission(permission);
       
-      if (currentPermission !== 'granted') {
-        const newPermission = await requestNotificationPermission();
-        setPermission(newPermission === 'default' ? 'denied' : newPermission as NotificationPermission);
-        
-        if (newPermission !== 'granted') {
-          setError('Notification permission denied');
-          setIsRegistering(false);
-          return;
-        }
+      if (permission !== 'granted') {
+        setError('Notification permission denied');
+        setIsRegistering(false);
+        return;
       }
 
-      // Get FCM token
-      const fcmToken = await requestNotificationPermission();
+      // Get FCM token after permission is granted
+      const fcmToken = await getFcmToken();
       
       if (fcmToken) {
         setToken(fcmToken);

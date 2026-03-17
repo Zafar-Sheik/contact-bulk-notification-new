@@ -116,14 +116,24 @@ export function validateNotificationInput(data: {
     errors.push('Message must be 500 characters or less');
   }
   
-  // Image URL validation (optional)
+  // Image URL validation (optional) - accepts regular URLs or base64 data URLs
   if (data.imageUrl) {
     if (typeof data.imageUrl !== 'string') {
       errors.push('Image URL must be a string');
     } else if (data.imageUrl.trim().length > 0) {
-      const urlValidation = validateUrl(data.imageUrl);
-      if (!urlValidation.valid) {
-        errors.push('Invalid image URL format');
+      // Check if it's a data URL (base64)
+      if (data.imageUrl.trim().startsWith('data:')) {
+        // Validate basic data URL format
+        const dataUrlPattern = /^data:image\/\w+;base64,/;
+        if (!dataUrlPattern.test(data.imageUrl.trim())) {
+          errors.push('Invalid base64 image data URL format');
+        }
+      } else {
+        // Validate as regular URL
+        const urlValidation = validateUrl(data.imageUrl);
+        if (!urlValidation.valid) {
+          errors.push('Invalid image URL format');
+        }
       }
     }
   }
