@@ -88,19 +88,17 @@ export async function sendNotificationToAllDevices(
   link?: string
 ): Promise<SendResult> {
   const message: FCMMessage = {
-    notification: {
-      title,
-      body,
-      image: imageUrl,
-    },
     webpush: {
       notification: {
         icon: '/icons/icon-192.png',
         badge: '/icons/icon-192.png',
         tag: 'notification',
-        data: link ? { url: link } : undefined,
+        title,
+        body,
+        image: imageUrl,
       },
       fcmOptions: link ? { link } : undefined,
+      data: link ? { url: link } : undefined,
     },
     tokens,
   };

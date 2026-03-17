@@ -119,7 +119,7 @@ export default function HomePage() {
               </svg>
             </div>
             <h1 className="text-4xl font-bold text-gray-900 mb-4">
-              Push Notifications
+              Contact Bulk Notification
             </h1>
             <p className="text-xl text-gray-600">
               Stay connected and receive important updates instantly

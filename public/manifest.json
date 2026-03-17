@@ -1,7 +1,7 @@
 {
-  "name": "Push Notifications App",
-  "short_name": "PushNotif",
-  "description": "Receive push notifications from the admin - Install this PWA to stay connected",
+  "name": "Contact Bulk Notification",
+  "short_name": "ContactNotif",
+  "description": "Send bulk notifications to your contacts - Install this PWA to stay connected",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

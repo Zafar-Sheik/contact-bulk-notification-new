@@ -60,6 +60,10 @@ export function PWAProvider({ children }: PWAProviderProps) {
   useEffect(() => {
     if (!isReady || !isSupported) return;
     
+    // Check if device is already registered and get stored token
+    const isRegistered = localStorage.getItem('deviceRegistered');
+    const storedToken = localStorage.getItem('fcmToken');
+    
     // Auto-register if permission was already granted
     const autoRegister = async () => {
       if (permission === 'granted' && !token) {
@@ -68,17 +72,28 @@ export function PWAProvider({ children }: PWAProviderProps) {
           const fcmToken = await getFcmToken();
           
           if (fcmToken) {
-            setToken(fcmToken);
+            // Check if token has changed or not registered yet
+            const shouldRegister = !isRegistered || fcmToken !== storedToken;
             
-            const response = await fetch('/api/device/register', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ fcmToken }),
-            });
+            if (shouldRegister) {
+              setToken(fcmToken);
+              
+              const response = await fetch('/api/device/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fcmToken }),
+              });
 
-            if (response.ok) {
-              const data = await response.json();
-              console.log('Device auto-registered:', data);
+              if (response.ok) {
+                const data = await response.json();
+                console.log('Device auto-registered:', data);
+                // Mark as registered and store token in localStorage
+                localStorage.setItem('deviceRegistered', 'true');
+                localStorage.setItem('fcmToken', fcmToken);
+              }
+            } else {
+              // Token hasn't changed and already registered, just set the token
+              setToken(fcmToken);
             }
           }
         } catch (err) {
@@ -148,6 +163,9 @@ export function PWAProvider({ children }: PWAProviderProps) {
 
         const data = await response.json();
         console.log('Device registered:', data);
+        // Mark as registered and store token in localStorage
+        localStorage.setItem('deviceRegistered', 'true');
+        localStorage.setItem('fcmToken', fcmToken);
       }
     } catch (err) {
       console.error('Error registering device:', err);
