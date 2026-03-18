@@ -5,6 +5,7 @@ import mongoose, { Schema, Document } from 'mongoose';
  */
 export interface IDevice extends Document {
   fcmToken: string;
+  province: 'Gauteng' | 'KwaZulu-Natal' | 'Western Cape' | 'Eastern Cape' | 'Free State' | 'Limpopo' | 'Mpumalanga' | 'North West' | 'Northern Cape' | 'unknown';
   deviceInfo: {
     platform: 'android' | 'ios' | 'windows' | 'mac' | 'linux' | 'unknown';
     browser: string;
@@ -36,7 +37,22 @@ const DeviceSchema = new Schema<IDevice>(
       type: String,
       required: [true, 'FCM token is required'],
       unique: true,
-      index: true,
+    },
+    province: {
+      type: String,
+      enum: [
+        'Gauteng',
+        'KwaZulu-Natal',
+        'Western Cape',
+        'Eastern Cape',
+        'Free State',
+        'Limpopo',
+        'Mpumalanga',
+        'North West',
+        'Northern Cape',
+        'unknown',
+      ],
+      default: 'unknown',
     },
     deviceInfo: {
       platform: {
@@ -93,6 +109,7 @@ const DeviceSchema = new Schema<IDevice>(
 );
 
 // Indexes for efficient queries
+DeviceSchema.index({ province: 1 });
 DeviceSchema.index({ 'deviceInfo.platform': 1 });
 DeviceSchema.index({ 'deviceInfo.browser': 1 });
 DeviceSchema.index({ 'metadata.isActive': 1 });

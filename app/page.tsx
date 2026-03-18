@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { usePWA } from '@/components/pwa/firebase-provider';
+import { ProvinceSelector, useProvinceSelection, type Province } from '@/components/pwa/province-selector';
 import NotificationCard from '@/components/ui/NotificationCard';
 import NotificationModal from '@/components/ui/NotificationModal';
 
@@ -25,12 +26,21 @@ export default function HomePage() {
     registerDevice 
   } = usePWA();
 
+  const { 
+    province, 
+    showSelector, 
+    selectProvince,
+    setShowSelector 
+  } = useProvinceSelection();
+
   const [isInstalled, setIsInstalled] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<Event | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
   const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [provinceConfirm, setProvinceConfirm] = useState<string | null>(null);
+  const [isChangingProvince, setIsChangingProvince] = useState(false);
 
   useEffect(() => {
     // Check if app is already installed
@@ -94,11 +104,43 @@ export default function HomePage() {
   };
 
   const handleEnableNotifications = async () => {
-    await registerDevice();
+    // Get province from localStorage if available
+    const savedProvince = localStorage.getItem('userProvince') || undefined;
+    await registerDevice(savedProvince);
+  };
+
+  const handleProvinceChange = async (newProvince: string) => {
+    setIsChangingProvince(true);
+    selectProvince(newProvince as Province);
+    setProvinceConfirm(newProvince);
+    
+    // Re-register device with new province if token exists
+    if (token) {
+      try {
+        await registerDevice(newProvince);
+      } catch (err) {
+        console.error('Failed to update province:', err);
+      }
+    }
+    
+    // Clear confirmation after 3 seconds
+    setTimeout(() => {
+      setProvinceConfirm(null);
+      setIsChangingProvince(false);
+    }, 3000);
   };
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      {/* Province Selector Modal */}
+      {showSelector && (
+        <ProvinceSelector
+          onSelect={handleProvinceChange}
+          onClose={() => setShowSelector(false)}
+          isOpen={showSelector}
+        />
+      )}
+
       <div className="container mx-auto px-4 py-16">
         <div className="max-w-2xl mx-auto">
           {/* Header */}
@@ -159,6 +201,24 @@ export default function HomePage() {
                     ? 'N/A' 
                     : permission.charAt(0).toUpperCase() + permission.slice(1)}
                 </span>
+              </div>
+
+              {/* Province Status */}
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <span className="text-gray-700">Your Province</span>
+                {provinceConfirm ? (
+                  <span className="px-4 py-2 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                    ✓ Saved: {provinceConfirm}
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => setShowSelector(true)}
+                    disabled={isChangingProvince}
+                    className="px-4 py-2 rounded-full text-sm font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors disabled:opacity-50"
+                  >
+                    {isChangingProvince ? 'Saving...' : (province || 'Not set')}
+                  </button>
+                )}
               </div>
 
               {/* Registration Status */}

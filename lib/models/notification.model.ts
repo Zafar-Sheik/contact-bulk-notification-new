@@ -8,6 +8,7 @@ export interface INotification extends Document {
   imageUrl?: string;
   link?: string;
   sentByAdmin: string;
+  targetProvince: string;
   status: NotificationStatus;
   sentCount: number;
   sentAt?: Date;
@@ -43,6 +44,10 @@ const NotificationSchema = new Schema<INotification>(
       type: String,
       required: [true, 'Admin ID is required'],
       trim: true,
+    },
+    targetProvince: {
+      type: String,
+      default: 'All',
     },
     status: {
       type: String,

@@ -63,16 +63,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { title, message, imageUrl, link } = body;
+    const { title, message, imageUrl, link, targetProvince } = body;
 
-    // Get all active device tokens (including devices without metadata for backward compatibility)
-    const devices = await Device.find({
+    // Build device query based on targetProvince
+    const deviceQuery: Record<string, unknown> = {
       $or: [
         { 'metadata.isActive': true },
         { metadata: { $exists: false } },
         { metadata: null }
       ]
-    }).select('fcmToken');
+    };
+
+    // Filter by province if specified (and not "All")
+    if (targetProvince && targetProvince !== 'All') {
+      deviceQuery.province = targetProvince;
+    }
+
+    // Get all active device tokens (including devices without metadata for backward compatibility)
+    const devices = await Device.find(deviceQuery).lean().select('fcmToken') as { fcmToken: string }[];
     
     if (devices.length === 0) {
       return NextResponse.json(
@@ -81,7 +89,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const tokens = devices.map((d: { fcmToken: string }) => d.fcmToken).filter(Boolean);
+    const tokens = devices.map((d) => d.fcmToken).filter(Boolean);
 
     if (tokens.length === 0) {
       return NextResponse.json(
@@ -109,6 +117,7 @@ export async function POST(request: NextRequest) {
       imageUrl: imageForDb,
       link: link?.trim() || '',
       sentByAdmin: adminSession.adminId,
+      targetProvince: targetProvince || 'All',
       sentAt: new Date(),
       status: result.success > 0 ? 'sent' : 'failed',
       sentCount: result.success,

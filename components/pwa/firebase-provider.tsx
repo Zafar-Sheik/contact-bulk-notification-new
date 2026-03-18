@@ -17,7 +17,7 @@ interface PWAContextType {
   token: string | null;
   isRegistering: boolean;
   error: string | null;
-  registerDevice: () => Promise<void>;
+  registerDevice: (province?: string) => Promise<void>;
 }
 
 const PWAContext = createContext<PWAContextType | null>(null);
@@ -78,10 +78,13 @@ export function PWAProvider({ children }: PWAProviderProps) {
             if (shouldRegister) {
               setToken(fcmToken);
               
+              // Get province from localStorage if available
+              const savedProvince = localStorage.getItem('userProvince') || undefined;
+              
               const response = await fetch('/api/device/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ fcmToken }),
+                body: JSON.stringify({ fcmToken, province: savedProvince }),
               });
 
               if (response.ok) {
@@ -120,7 +123,7 @@ export function PWAProvider({ children }: PWAProviderProps) {
     };
   }, [isReady, isSupported]);
 
-  const registerDevice = async () => {
+  const registerDevice = async (province?: string) => {
     if (!isSupported) {
       setError('Notifications are not supported on this device');
       return;
@@ -154,6 +157,7 @@ export function PWAProvider({ children }: PWAProviderProps) {
           },
           body: JSON.stringify({
             fcmToken,
+            province,
           }),
         });
 
@@ -166,6 +170,11 @@ export function PWAProvider({ children }: PWAProviderProps) {
         // Mark as registered and store token in localStorage
         localStorage.setItem('deviceRegistered', 'true');
         localStorage.setItem('fcmToken', fcmToken);
+        
+        // Store province in localStorage if provided
+        if (province) {
+          localStorage.setItem('userProvince', province);
+        }
       }
     } catch (err) {
       console.error('Error registering device:', err);

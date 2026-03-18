@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 
 interface Device {
   _id: string;
+  province: string;
   deviceInfo: {
     platform: string;
     browser: string;
@@ -273,6 +274,9 @@ export default function DevicesPage() {
                       Language
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      Province
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
@@ -312,6 +316,11 @@ export default function DevicesPage() {
                       <td className="px-6 py-4">
                         <span className="text-sm text-gray-600">
                           {device.deviceInfo.language || '-'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-sm text-gray-600">
+                          {device.province || 'Unknown'}
                         </span>
                       </td>
                       <td className="px-6 py-4">

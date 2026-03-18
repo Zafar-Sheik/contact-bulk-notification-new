@@ -15,6 +15,7 @@ export default function AdminDashboard() {
   const [link, setLink] = useState('');
   const [scheduledAt, setScheduledAt] = useState('');
   const [isScheduled, setIsScheduled] = useState(false);
+  const [targetProvince, setTargetProvince] = useState('All');
   const [isSending, setIsSending] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState('');
@@ -101,6 +102,7 @@ export default function AdminDashboard() {
         message: message.trim(),
         imageUrl: imageData.trim() || undefined,
         link: link.trim() || undefined,
+        targetProvince: targetProvince !== 'All' ? targetProvince : undefined,
       };
 
       const response = await fetch('/api/notifications/send', {
@@ -126,6 +128,7 @@ export default function AdminDashboard() {
       setLink('');
       setScheduledAt('');
       setIsScheduled(false);
+      setTargetProvince('All');
 
       // Refresh device stats
       const statsResponse = await fetch('/api/admin/devices');
@@ -273,6 +276,31 @@ export default function AdminDashboard() {
               placeholder="Enter notification message"
             />
             <p className="mt-2 text-xs text-gray-400">{message.length}/500 characters</p>
+          </div>
+
+          {/* Target Province */}
+          <div>
+            <label htmlFor="targetProvince" className="block text-sm font-semibold text-gray-700 mb-2">
+              Target Province <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <select
+              id="targetProvince"
+              value={targetProvince}
+              onChange={(e) => setTargetProvince(e.target.value)}
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+            >
+              <option value="All">All Provinces</option>
+              <option value="Gauteng">Gauteng</option>
+              <option value="KwaZulu-Natal">KwaZulu-Natal</option>
+              <option value="Western Cape">Western Cape</option>
+              <option value="Eastern Cape">Eastern Cape</option>
+              <option value="Free State">Free State</option>
+              <option value="Limpopo">Limpopo</option>
+              <option value="Mpumalanga">Mpumalanga</option>
+              <option value="North West">North West</option>
+              <option value="Northern Cape">Northern Cape</option>
+            </select>
+            <p className="mt-2 text-xs text-gray-400">Leave as "All Provinces" to send to all devices</p>
           </div>
 
           {/* Image Upload */}
