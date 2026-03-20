@@ -56,6 +56,17 @@ export default function RootLayout({
         <meta name="msapplication-config" content="none" />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        {/* Global Header with Logo */}
+        <header className="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 z-40">
+          <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-center">
+            <img 
+              src="/images/logo.png" 
+              alt="Contact Bulk Notification" 
+              className="h-14 md:h-16 w-auto object-contain"
+            />
+          </div>
+        </header>
+
         {/* 
           Auto-register:
           1. Service Worker - handles PWA offline functionality
@@ -64,7 +75,9 @@ export default function RootLayout({
         */}
         <ServiceWorkerRegistration>
           <PWAProvider>
-            {children}
+            <div className="pt-20">
+              {children}
+            </div>
             <InstallPrompt />
           </PWAProvider>
         </ServiceWorkerRegistration>

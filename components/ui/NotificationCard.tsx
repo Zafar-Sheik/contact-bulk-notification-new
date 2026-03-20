@@ -75,11 +75,11 @@ export default function NotificationCard({ notification, onClick, index }: Notif
 
         {/* Image thumbnail if available */}
         {notification.image && (
-          <div className="mt-3 rounded-lg overflow-hidden">
+          <div className="mt-3 rounded-lg overflow-hidden bg-gray-100">
             <img 
               src={notification.image} 
               alt="" 
-              className="w-full h-20 object-cover group-hover:scale-105 transition-transform duration-300"
+              className="w-full h-24 object-contain group-hover:scale-105 transition-transform duration-300"
             />
           </div>
         )}
