@@ -154,7 +154,7 @@ export function useDeviceRegistration() {
   }, []);
 
   // Send token to API
-  const sendToAPI = useCallback(async (token: string, deviceInfo: DeviceInfo): Promise<RegistrationResult> => {
+  const sendToAPI = useCallback(async (token: string, deviceInfo: DeviceInfo, province?: string): Promise<RegistrationResult> => {
     try {
       const response = await fetch('/api/devices/register', {
         method: 'POST',
@@ -167,6 +167,7 @@ export function useDeviceRegistration() {
           platform: deviceInfo.platform,
           os: deviceInfo.os,
           lastSeen: new Date().toISOString(),
+          province,
         }),
       });
 
@@ -194,7 +195,7 @@ export function useDeviceRegistration() {
   }, []);
 
   // Complete registration flow
-  const registerDevice = useCallback(async (): Promise<RegistrationResult> => {
+  const registerDevice = useCallback(async (province?: string): Promise<RegistrationResult> => {
     if (typeof window === 'undefined') {
       return { success: false, error: 'Must run in browser' };
     }
@@ -226,12 +227,17 @@ export function useDeviceRegistration() {
       const deviceInfo = parseUserAgent(userAgent);
 
       // Step 4: Send to API
-      const result = await sendToAPI(token, deviceInfo);
+      const result = await sendToAPI(token, deviceInfo, province);
 
       if (result.success) {
         setIsRegistered(true);
         setDeviceId(result.deviceId || null);
         sessionStorage.setItem('deviceRegistered', result.deviceId || '');
+        
+        // Store province in localStorage if provided
+        if (province) {
+          localStorage.setItem('userProvince', province);
+        }
       } else {
         setError(result.error || 'Registration failed');
       }
@@ -249,8 +255,42 @@ export function useDeviceRegistration() {
   // Check if device can register
   const canRegister = permission !== 'denied' && permission !== 'unsupported';
 
+  // Update province for existing device
+  const updateProvince = useCallback(async (newProvince: string): Promise<boolean> => {
+    if (typeof window === 'undefined') return false;
+
+    const token = sessionStorage.getItem('fcmToken');
+    if (!token) {
+      console.error('No FCM token found');
+      return false;
+    }
+
+    try {
+      const response = await fetch('/api/device/province', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fcmToken: token,
+          province: newProvince,
+        }),
+      });
+
+      if (response.ok) {
+        localStorage.setItem('userProvince', newProvince);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('Error updating province:', err);
+      return false;
+    }
+  }, []);
+
   return {
     registerDevice,
+    updateProvince,
     isRegistering,
     isRegistered,
     permission,

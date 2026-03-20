@@ -7,7 +7,7 @@ import type { DeviceRegistrationBody } from '@/types';
 export async function POST(request: NextRequest) {
   try {
     const body: DeviceRegistrationBody = await request.json();
-    const { fcmToken, deviceInfo } = body;
+    const { fcmToken, deviceInfo, province } = body;
 
     if (!fcmToken) {
       return NextResponse.json(
@@ -45,6 +45,12 @@ export async function POST(request: NextRequest) {
           existingDevice.metadata.appVersion = (deviceInfo as { appVersion?: string }).appVersion;
         }
       }
+
+      // Update province if provided
+      if (province) {
+        existingDevice.province = province;
+      }
+
       await existingDevice.save();
 
       return NextResponse.json({
@@ -57,6 +63,7 @@ export async function POST(request: NextRequest) {
     // Create new device
     const device = new Device({
       fcmToken,
+      province: province || 'unknown',
       deviceInfo: {
         platform,
         browser,

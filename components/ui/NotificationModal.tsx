@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 
 interface NotificationModalProps {
   isOpen: boolean;
@@ -16,10 +16,17 @@ interface NotificationModalProps {
 }
 
 export default function NotificationModal({ isOpen, onClose, notification }: NotificationModalProps) {
+  const [isImageExpanded, setIsImageExpanded] = useState(false);
+
+  const handleCloseModal = () => {
+    setIsImageExpanded(false);
+    onClose();
+  };
+
   // Handle escape key
   const handleEscape = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape') {
-      onClose();
+      handleCloseModal();
     }
   }, [onClose]);
 
@@ -91,12 +98,49 @@ export default function NotificationModal({ isOpen, onClose, notification }: Not
 
             {/* Image */}
             {notification.image && (
-              <div className="mb-6 rounded-xl overflow-hidden bg-gray-100">
-                <img 
-                  src={notification.image} 
-                  alt="Notification attachment"
-                  className="w-full h-48 object-cover"
-                />
+              <div className="mb-6">
+                <div 
+                  className={`relative rounded-xl overflow-hidden bg-gray-100 cursor-zoom-in transition-all duration-300 ${
+                    isImageExpanded ? 'fixed inset-4 z-[60] m-0' : ''
+                  }`}
+                  onClick={() => setIsImageExpanded(!isImageExpanded)}
+                >
+                  <img 
+                    src={notification.image} 
+                    alt="Notification attachment"
+                    className={`w-full h-auto max-h-[60vh] object-contain transition-all duration-300 ${
+                      isImageExpanded ? 'h-full max-h-[90vh] w-auto' : ''
+                    }`}
+                  />
+                  {/* Zoom indicator */}
+                  {!isImageExpanded && (
+                    <div className="absolute bottom-3 right-3 bg-black/50 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                      </svg>
+                      Tap to expand
+                    </div>
+                  )}
+                  {/* Close expanded view button */}
+                  {isImageExpanded && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsImageExpanded(false);
+                      }}
+                      className="absolute top-4 right-4 p-2 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+                {isImageExpanded && (
+                  <p className="text-center text-xs text-gray-500 mt-2">
+                    Click outside or the X button to close
+                  </p>
+                )}
               </div>
             )}
 

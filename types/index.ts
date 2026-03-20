@@ -3,6 +3,7 @@
 export interface IDevice {
   _id: string;
   fcmToken: string;
+  province: 'Gauteng' | 'KwaZulu-Natal' | 'Western Cape' | 'Eastern Cape' | 'Free State' | 'Limpopo' | 'Mpumalanga' | 'North West' | 'Northern Cape' | 'unknown';
   deviceInfo: {
     platform: 'android' | 'ios' | 'windows' | 'mac' | 'linux' | 'unknown';
     browser: string;
@@ -26,6 +27,7 @@ export interface INotification {
   sentAt?: Date;
   scheduledAt?: Date;
   status: 'sent' | 'pending' | 'failed' | 'scheduled';
+  targetProvince: string;
   recipientCount: number;
   createdBy?: string;
   createdAt: Date;
@@ -42,6 +44,7 @@ export interface IAdmin {
 
 export interface DeviceRegistrationBody {
   fcmToken: string;
+  province?: string;
   deviceInfo: {
     platform: 'android' | 'ios' | 'windows' | 'mac' | 'linux' | 'unknown';
     browser: string;
@@ -56,6 +59,7 @@ export interface SendNotificationBody {
   image?: string;
   link?: string;
   scheduledAt?: string;
+  targetProvince?: string;
 }
 
 export interface AdminLoginBody {
@@ -90,11 +94,15 @@ export interface FCMMessage {
       icon?: string;
       badge?: string;
       tag?: string;
-      data?: Record<string, unknown>;
+      title?: string;
+      body?: string;
+      image?: string;
+      data?: Record<string, string>;
     };
     fcmOptions?: {
       link?: string;
     };
+    data?: Record<string, string>;
   };
   tokens: string[];
 }

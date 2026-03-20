@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
 
     // Get all active device tokens
     console.log('Fetching active devices...');
-    const devices = await Device.find({ 'metadata.isActive': true }).select('fcmToken');
+    const devices = await Device.find({ 'metadata.isActive': true }).lean().select('fcmToken') as { fcmToken: string }[];
     console.log('Found devices:', devices.length);
     
     if (devices.length === 0) {
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const tokens = devices.map((d: { fcmToken: string }) => d.fcmToken);
+    const tokens = devices.map((d) => d.fcmToken);
     console.log('FCM tokens:', tokens.length);
 
     // Send notifications
