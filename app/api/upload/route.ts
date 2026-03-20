@@ -90,34 +90,38 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer();
     const inputBuffer = Buffer.from(bytes);
     
-    // Try to compress and resize image
-    let compressedBuffer: Buffer;
-    let mimeType = 'image/jpeg';
+    // Keep original image quality - no compression or resizing
+    let imageBuffer: Buffer;
+    let mimeType = file.type;
     
     try {
       const sharpModule = await getSharp();
       if (sharpModule) {
-        // Compress to very small size for FCM (max 50KB total payload)
-        compressedBuffer = await sharpModule(inputBuffer)
-          .resize(100, 100, {
-            fit: 'inside',
-            withoutEnlargement: true,
-          })
-          .jpeg({ quality: 50 })
-          .toBuffer();
+        // Get image metadata to determine if processing is needed
+        const metadata = await sharpModule(inputBuffer).metadata();
+        
+        // Convert to PNG for transparency support if needed, otherwise keep original format
+        if (file.type === 'image/png' || file.type === 'image/gif' || file.type === 'image/webp') {
+          // Keep original format for lossless images
+          imageBuffer = await sharpModule(inputBuffer).toBuffer();
+        } else {
+          // For JPEG, use maximum quality to preserve original quality
+          imageBuffer = await sharpModule(inputBuffer)
+            .jpeg({ quality: 100 })
+            .toBuffer();
+        }
       } else {
-        // Fallback: no compression
-        compressedBuffer = inputBuffer;
-        mimeType = file.type;
+        // Fallback: no processing
+        imageBuffer = inputBuffer;
       }
-    } catch (compressionError) {
-      console.error('Compression failed, using original:', compressionError);
+    } catch (processingError) {
+      console.error('Image processing failed, using original:', processingError);
       // Fallback: use original buffer
-      compressedBuffer = inputBuffer;
+      imageBuffer = inputBuffer;
       mimeType = file.type;
     }
     
-    const base64 = compressedBuffer.toString('base64');
+    const base64 = imageBuffer.toString('base64');
     
     // Create data URL for the image
     const imageDataUrl = `data:${mimeType};base64,${base64}`;
@@ -127,7 +131,7 @@ export async function POST(request: NextRequest) {
       imageData: imageDataUrl,
       base64: base64,
       mimeType: mimeType,
-      size: compressedBuffer.length,
+      size: imageBuffer.length,
     });
   } catch (error) {
     console.error('Upload error:', error);

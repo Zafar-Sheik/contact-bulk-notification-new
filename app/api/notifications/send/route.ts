@@ -128,10 +128,11 @@ export async function POST(request: NextRequest) {
     // Clean up invalid tokens
     if (result.errors && result.errors.length > 0) {
       const invalidTokens = result.errors
-        .filter(e => e.error.includes('NOT_FOUND') || e.error.includes('Invalid'))
+        .filter(e => e.error.includes('NOT_FOUND') || e.error.includes('Invalid') || e.error.includes('NotRegistered'))
         .map(e => tokens[e.index]);
       
       if (invalidTokens.length > 0) {
+        console.log('Cleaning up', invalidTokens.length, 'invalid tokens');
         await Device.deleteMany({ fcmToken: { $in: invalidTokens } });
       }
     }

@@ -62,7 +62,7 @@ export default function RootLayout({
             <img 
               src="/images/logo.png" 
               alt="Contact Bulk Notification" 
-              className="h-14 md:h-16 w-auto object-contain"
+              className="h-14 md:h-16 w-auto max-w-full"
             />
           </div>
         </header>
