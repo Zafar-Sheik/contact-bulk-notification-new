@@ -1,4 +1,5 @@
 import { getMessaging } from './admin';
+import sharp from 'sharp';
 import type { FCMMessage } from '@/types';
 
 const BATCH_SIZE = 500; // FCM allows max 500 tokens per batch
@@ -78,6 +79,52 @@ export async function sendPushNotification(
 }
 
 /**
+ * Compress image for FCM - aggressively reduce size to ensure it sends
+ * FCM has 4KB limit for notification payload
+ */
+async function compressImageForFCM(imageDataUrl: string): Promise<string | null> {
+  try {
+    // Extract base64 data from data URL
+    const base64Data = imageDataUrl.replace(/^data:image\/\w+;base64,/, '');
+    const imageBuffer = Buffer.from(base64Data, 'base64');
+    
+    // Aggressive compression - start small and reduce quality
+    // FCM notification payload limit is 4KB
+    
+    // Try 1: 100x100 with moderate quality
+    const img1 = await sharp(imageBuffer)
+      .resize(100, 100, { fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: 60 })
+      .toBuffer();
+    
+    if (img1.length <= 4000) {
+      return `data:image/webp;base64,${img1.toString('base64')}`;
+    }
+    
+    // Try 2: 80x80 with lower quality
+    const img2 = await sharp(imageBuffer)
+      .resize(80, 80, { fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: 50 })
+      .toBuffer();
+    
+    if (img2.length <= 4000) {
+      return `data:image/webp;base64,${img2.toString('base64')}`;
+    }
+    
+    // Try 3: 60x60 with low quality
+    const img3 = await sharp(imageBuffer)
+      .resize(60, 60, { fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: 40 })
+      .toBuffer();
+    
+    return `data:image/webp;base64,${img3.toString('base64')}`;
+  } catch (error) {
+    console.error('Failed to compress image for FCM:', error);
+    return null;
+  }
+}
+
+/**
  * Send a simple notification to all devices
  */
 export async function sendNotificationToAllDevices(
@@ -87,11 +134,21 @@ export async function sendNotificationToAllDevices(
   imageUrl?: string,
   link?: string
 ): Promise<SendResult> {
+  // For Android, we need to compress the image to stay under 4KB payload limit
+  let fcmImageUrl = imageUrl;
+  if (imageUrl && imageUrl.startsWith('data:')) {
+    // Image is base64 encoded - compress it for FCM
+    const compressedImage = await compressImageForFCM(imageUrl);
+    if (compressedImage) {
+      fcmImageUrl = compressedImage;
+    }
+  }
+
   const message: FCMMessage = {
     notification: {
       title,
       body,
-      image: imageUrl,
+      image: fcmImageUrl,
     },
     webpush: {
       notification: {
@@ -100,7 +157,7 @@ export async function sendNotificationToAllDevices(
         tag: 'notification',
         title,
         body,
-        image: imageUrl,
+        image: fcmImageUrl,
       },
       fcmOptions: link ? { link } : undefined,
       data: link ? { url: link } : undefined,
