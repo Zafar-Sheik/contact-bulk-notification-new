@@ -21,13 +21,21 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message:', payload);
 
+  // Only show notification if it doesn't have 'foreground' flag in data
+  // This prevents duplicates when the app is in foreground
+  if (payload.data?.foreground === 'true') {
+    console.log('[firebase-messaging-sw.js] Skipping background display - foreground will handle it');
+    return;
+  }
+
   // Extract notification data
   const notificationTitle = payload.notification?.title || 'Notification';
   const notificationOptions = {
     body: payload.notification?.body || '',
     icon: payload.notification?.image || '/icons/icon-192.png',
     badge: '/icons/icon-192.png',
-    tag: payload.notification?.tag || 'firebase-notification',
+    // Use unique tag from data to prevent duplicate notifications on iOS
+    tag: payload.data?.notificationId || 'firebase-notification',
     data: payload.data || {},
     actions: [
       {

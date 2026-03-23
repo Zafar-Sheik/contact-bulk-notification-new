@@ -110,12 +110,26 @@ export function PWAProvider({ children }: PWAProviderProps) {
     autoRegister();
   }, [isReady, isSupported, permission, token]);
 
-  // Listen for foreground messages
+  // Listen for foreground messages and display them
   useEffect(() => {
     if (!isReady || !isSupported) return;
 
     const unsubscribe = onForegroundMessage((payload) => {
       console.log('Foreground message received:', payload);
+      
+      // Show notification when app is in foreground
+      const payloadObj = payload as { notification?: { title?: string; body?: string; image?: string }; data?: Record<string, unknown> };
+      if (payloadObj && payloadObj.notification) {
+        // Display the notification using the browser's Notification API
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification(payloadObj.notification.title || 'Notification', {
+            body: payloadObj.notification.body || '',
+            icon: payloadObj.notification.image || '/icons/icon-192.png',
+            tag: (payloadObj.data?.notificationId as string) || 'notification',
+            data: payloadObj.data || {}
+          });
+        }
+      }
     });
 
     return () => {
