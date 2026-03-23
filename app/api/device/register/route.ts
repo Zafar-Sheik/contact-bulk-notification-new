@@ -37,6 +37,18 @@ export async function POST(request: NextRequest) {
     if (deviceId) {
       // First check by persistent deviceId
       existingDevice = await Device.findOne({ deviceId });
+      
+      // If device exists with same deviceId but different platform (iOS duplicate issue)
+      // Check if the platform type changed significantly (e.g., Android -> iOS or vice versa)
+      if (existingDevice && platform !== 'unknown' && existingDevice.deviceInfo?.platform !== 'unknown') {
+        if (existingDevice.deviceInfo.platform !== platform) {
+          // Platform changed - this is likely a duplicate from a different platform
+          // Remove the old device and create fresh
+          console.log(`Platform change detected: ${existingDevice.deviceInfo.platform} -> ${platform}. Removing old device.`);
+          await Device.deleteOne({ _id: existingDevice._id });
+          existingDevice = null;
+        }
+      }
     }
     
     // Also check by FCM token (for devices registered before deviceId was added)
@@ -47,6 +59,37 @@ export async function POST(request: NextRequest) {
     // Check if the FCM token exists in the fcmTokens array of any device
     if (!existingDevice) {
       existingDevice = await Device.findOne({ fcmTokens: fcmToken });
+    }
+    
+    // If still no existing device, check for potential duplicates on same platform
+    // This handles iOS reinstall scenario where deviceId changes but platform is same
+    if (!existingDevice && platform !== 'unknown') {
+      const potentialDuplicates = await Device.find({
+        'deviceInfo.platform': platform,
+        'deviceInfo.browser': browser
+      }).limit(10);
+      
+      // If we find a device with same platform/browser but different deviceId,
+      // it's likely a reinstall - update the deviceId instead of creating new
+      if (potentialDuplicates.length > 0) {
+        for (const dup of potentialDuplicates) {
+          // Check if it's truly a reinstall by checking if old token exists in the new device's context
+          // or if the device has been inactive for a while
+          const lastSeen = dup.metadata?.lastSeen;
+          const hoursSinceLastSeen = lastSeen ? (Date.now() - new Date(lastSeen).getTime()) / (1000 * 60 * 60) : 999;
+          
+          // If device hasn't been seen in over 24 hours, likely a reinstall - update it
+          if (hoursSinceLastSeen > 24) {
+            console.log(`Potential duplicate device found (inactive for ${hoursSinceLastSeen.toFixed(1)} hours). Updating deviceId from ${dup.deviceId} to ${deviceId}`);
+            dup.deviceId = deviceId;
+            dup.metadata.lastSeen = new Date();
+            dup.metadata.isActive = true;
+            await dup.save();
+            existingDevice = dup;
+            break;
+          }
+        }
+      }
     }
 
     if (existingDevice) {

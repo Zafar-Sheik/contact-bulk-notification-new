@@ -67,8 +67,8 @@ export async function POST(request: NextRequest) {
     // Collect all tokens (primary + additional)
     const tokens: string[] = [];
     devices.forEach((d) => {
-      // Add primary token
-      if (d.fcmToken) {
+      // Add primary token (with deduplication check)
+      if (d.fcmToken && !tokens.includes(d.fcmToken)) {
         tokens.push(d.fcmToken);
       }
       // Add additional tokens from array

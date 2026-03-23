@@ -21,6 +21,13 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message:', payload);
 
+  // Only show notification if it doesn't have 'foreground' flag in data
+  // This prevents duplicates when the app is in foreground
+  if (payload.data?.foreground === 'true') {
+    console.log('[firebase-messaging-sw.js] Skipping background display - foreground will handle it');
+    return;
+  }
+
   // Extract notification data
   const notificationTitle = payload.notification?.title || 'Notification';
   const notificationOptions = {
