@@ -6,6 +6,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 export interface IDevice extends Document {
   deviceId?: string;
   fcmToken: string;
+  fcmTokens?: string[]; // Array of additional FCM tokens (for PWA/browser duplicates)
   province: 'Gauteng' | 'KwaZulu-Natal' | 'Western Cape' | 'Eastern Cape' | 'Free State' | 'Limpopo' | 'Mpumalanga' | 'North West' | 'Northern Cape' | 'unknown';
   deviceInfo: {
     platform: 'android' | 'ios' | 'windows' | 'mac' | 'linux' | 'unknown';
@@ -43,6 +44,11 @@ const DeviceSchema = new Schema<IDevice>(
       type: String,
       required: [true, 'FCM token is required'],
       unique: true,
+    },
+    fcmTokens: {
+      type: [String],
+      default: [],
+      description: 'Additional FCM tokens for the same device (browser/PWA)',
     },
     province: {
       type: String,

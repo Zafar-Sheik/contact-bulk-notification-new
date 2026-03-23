@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
       ? { platform: deviceInfo.platform, browser: deviceInfo.browser || 'unknown' }
       : parseUserAgent(userAgent);
 
-    // Check if device already exists by deviceId or fcmToken
+    // Check if device already exists by deviceId, fcmToken, or in fcmTokens array
     let existingDevice = null;
     
     if (deviceId) {
@@ -42,6 +42,11 @@ export async function POST(request: NextRequest) {
     // Also check by FCM token (for devices registered before deviceId was added)
     if (!existingDevice) {
       existingDevice = await Device.findOne({ fcmToken });
+    }
+    
+    // Check if the FCM token exists in the fcmTokens array of any device
+    if (!existingDevice) {
+      existingDevice = await Device.findOne({ fcmTokens: fcmToken });
     }
 
     if (existingDevice) {
@@ -62,9 +67,22 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Update FCM token if it changed (token refresh)
+      // Initialize fcmTokens array if it doesn't exist
+      if (!existingDevice.fcmTokens) {
+        existingDevice.fcmTokens = [];
+      }
+
+      // Update primary FCM token if it changed (token refresh)
       if (existingDevice.fcmToken !== fcmToken) {
+        // Add old token to fcmTokens array if it's not already there
+        if (existingDevice.fcmToken && !existingDevice.fcmTokens.includes(existingDevice.fcmToken)) {
+          existingDevice.fcmTokens.push(existingDevice.fcmToken);
+        }
+        // Set new token as primary
         existingDevice.fcmToken = fcmToken;
+      } else if (!existingDevice.fcmTokens.includes(fcmToken) && existingDevice.fcmToken !== fcmToken) {
+        // Add additional token to fcmTokens array
+        existingDevice.fcmTokens.push(fcmToken);
       }
 
       // Update deviceId if not set
