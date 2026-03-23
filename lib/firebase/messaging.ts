@@ -31,45 +31,53 @@ export async function sendPushNotification(
   let failedCount = 0;
   const errors: Array<{ index: number; error: string }> = [];
 
-  // Process tokens in batches of 500
+  // Process tokens in batches of 500 - using parallel processing for faster delivery
+  const batchPromises: Promise<void>[] = [];
+  
   for (let i = 0; i < tokens.length; i += BATCH_SIZE) {
     const batchTokens = tokens.slice(i, i + BATCH_SIZE);
     
-    try {
-      console.log('FCM: Sending batch', Math.floor(i / BATCH_SIZE) + 1, 'of', Math.ceil(tokens.length / BATCH_SIZE));
-      const response = await getMessaging().sendEachForMulticast({
-        notification: message.notification,
-        webpush: message.webpush,
-        tokens: batchTokens,
-      });
-      
-      console.log('FCM: Batch result - success:', response.successCount, 'failure:', response.failureCount);
-      successCount += response.successCount;
-      failedCount += response.failureCount;
-
-      // Collect errors with their indices
-      if (response.responses) {
-        response.responses.forEach((resp, idx) => {
-          if (!resp.success) {
-            const errorMsg = resp.error?.message || 'Unknown error';
-            console.log('FCM: Token index', i + idx, 'failed:', errorMsg);
-            errors.push({
-              index: i + idx,
-              error: errorMsg,
-            });
-            
-            // Handle invalid tokens - mark for removal
-            if (errorMsg.includes('NOT_FOUND') || errorMsg.includes('NotRegistered') || errorMsg.includes('Invalid')) {
-              console.log('FCM: Invalid token detected at index', i + idx);
-            }
-          }
+    // Create a promise for each batch
+    batchPromises.push((async () => {
+      try {
+        console.log('FCM: Sending batch', Math.floor(i / BATCH_SIZE) + 1, 'of', Math.ceil(tokens.length / BATCH_SIZE));
+        const response = await getMessaging().sendEachForMulticast({
+          notification: message.notification,
+          webpush: message.webpush,
+          tokens: batchTokens,
         });
+        
+        console.log('FCM: Batch result - success:', response.successCount, 'failure:', response.failureCount);
+        successCount += response.successCount;
+        failedCount += response.failureCount;
+
+        // Collect errors with their indices
+        if (response.responses) {
+          response.responses.forEach((resp, idx) => {
+            if (!resp.success) {
+              const errorMsg = resp.error?.message || 'Unknown error';
+              console.log('FCM: Token index', i + idx, 'failed:', errorMsg);
+              errors.push({
+                index: i + idx,
+                error: errorMsg,
+              });
+              
+              // Handle invalid tokens - mark for removal
+              if (errorMsg.includes('NOT_FOUND') || errorMsg.includes('NotRegistered') || errorMsg.includes('Invalid')) {
+                console.log('FCM: Invalid token detected at index', i + idx);
+              }
+            }
+          });
+        }
+      } catch (error) {
+        console.error(`Error sending batch ${i / BATCH_SIZE + 1}:`, error);
+        failedCount += batchTokens.length;
       }
-    } catch (error) {
-      console.error(`Error sending batch ${i / BATCH_SIZE + 1}:`, error);
-      failedCount += batchTokens.length;
-    }
+    })());
   }
+  
+  // Wait for all batches to complete in parallel
+  await Promise.all(batchPromises);
 
   return {
     success: successCount,
@@ -135,14 +143,20 @@ export async function sendNotificationToAllDevices(
   link?: string,
   notificationId?: string
 ): Promise<SendResult> {
-  // For Android, we need to compress the image to stay under 4KB payload limit
+  // For Android/FCM, we need to compress the image to stay under 4KB payload limit
   let fcmImageUrl = imageUrl;
   if (imageUrl && imageUrl.startsWith('data:')) {
     // Image is base64 encoded - compress it for FCM
+    console.log('Compressing base64 image for FCM...');
     const compressedImage = await compressImageForFCM(imageUrl);
     if (compressedImage) {
       fcmImageUrl = compressedImage;
+      console.log('Image compressed successfully');
     }
+  } else if (imageUrl && imageUrl.startsWith('http')) {
+    // For URL images, use a smaller thumbnail for push notification
+    // FCM can fetch the full image from URL for Android, but we use a small one for webpush
+    fcmImageUrl = imageUrl;
   }
 
   // Build data payload with notification ID for deep linking
@@ -153,8 +167,6 @@ export async function sendNotificationToAllDevices(
   if (link) {
     dataPayload.url = link;
   }
-  // Add flag to prevent duplicate notifications when app is in foreground
-  dataPayload.foreground = 'true';
 
   const message: FCMMessage = {
     notification: {

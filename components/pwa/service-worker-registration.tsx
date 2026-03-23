@@ -2,6 +2,27 @@
 
 import { useEffect, useState, ReactNode } from 'react';
 
+/**
+ * Register the Firebase Messaging service worker
+ * This is required for push notifications to work properly
+ */
+function useFirebaseMessagingWorker() {
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
+      return;
+    }
+
+    // Register Firebase Messaging service worker
+    navigator.serviceWorker.register('/firebase-messaging-sw.js')
+      .then((registration) => {
+        console.log('Firebase Messaging Service Worker registered:', registration);
+      })
+      .catch((error) => {
+        console.error('Firebase Messaging Service Worker registration failed:', error);
+      });
+  }, []);
+}
+
 interface ServiceWorkerRegistrationOptions {
   onSuccess?: (registration: ServiceWorkerRegistration) => void;
   onUpdate?: (registration: ServiceWorkerRegistration) => void;
@@ -66,6 +87,9 @@ export function ServiceWorkerRegistration({
 }: {
   children: ReactNode;
 }) {
+  // Register Firebase Messaging service worker
+  useFirebaseMessagingWorker();
+  // Register PWA service worker
   useServiceWorkerRegistration();
   
   return <>{children}</>;
