@@ -51,9 +51,9 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Get all active device tokens
+    // Get all active device tokens (including additional tokens in fcmTokens array)
     console.log('Fetching active devices...');
-    const devices = await Device.find({ 'metadata.isActive': true }).lean().select('fcmToken') as { fcmToken: string }[];
+    const devices = await Device.find({ 'metadata.isActive': true }).lean().select('fcmToken fcmTokens') as { fcmToken: string; fcmTokens?: string[] }[];
     console.log('Found devices:', devices.length);
     
     if (devices.length === 0) {
@@ -64,7 +64,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const tokens = devices.map((d) => d.fcmToken);
+    // Collect all tokens (primary + additional)
+    const tokens: string[] = [];
+    devices.forEach((d) => {
+      // Add primary token
+      if (d.fcmToken) {
+        tokens.push(d.fcmToken);
+      }
+      // Add additional tokens from array
+      if (d.fcmTokens && d.fcmTokens.length > 0) {
+        d.fcmTokens.forEach((t) => {
+          if (t && !tokens.includes(t)) {
+            tokens.push(t);
+          }
+        });
+      }
+    });
+    console.log('Total FCM tokens:', tokens.length);
     console.log('FCM tokens:', tokens.length);
 
     // Save to notification history first (to get the _id)
@@ -116,9 +132,14 @@ export async function POST(request: NextRequest) {
       read: false,
     };
 
-    // Update all devices that were targeted
+    // Update all devices that were targeted (check both fcmToken and fcmTokens array)
     await Device.updateMany(
-      { fcmToken: { $in: tokens } },
+      {
+        $or: [
+          { fcmToken: { $in: tokens } },
+          { fcmTokens: { $in: tokens } }
+        ]
+      },
       { $push: { receivedNotifications: notificationEntry } }
     );
 
@@ -130,8 +151,36 @@ export async function POST(request: NextRequest) {
       
       console.log('Cleaning up', invalidTokens.length, 'invalid tokens');
       if (invalidTokens.length > 0) {
-        await Device.deleteMany({ fcmToken: { $in: invalidTokens } });
-        console.log('Removed', invalidTokens.length, 'invalid devices from database');
+        // For each invalid token, either remove it from fcmTokens array or delete the device
+        for (const invalidToken of invalidTokens) {
+          // Try to find device with this as primary token
+          const device = await Device.findOne({ fcmToken: invalidToken });
+          if (device) {
+            // Check if device has additional tokens
+            if (device.fcmTokens && device.fcmTokens.length > 0) {
+              // Promote an additional token to primary and remove invalid
+              const validToken = device.fcmTokens?.find((t: string) => t !== invalidToken);
+              if (validToken) {
+                device.fcmToken = validToken;
+                device.fcmTokens = device.fcmTokens?.filter((t: string) => t !== invalidToken && t !== validToken);
+                await device.save();
+              } else {
+                // No valid tokens left, delete device
+                await Device.deleteOne({ _id: device._id });
+              }
+            } else {
+              // No additional tokens, delete device
+              await Device.deleteOne({ _id: device._id });
+            }
+          } else {
+            // Token might be in fcmTokens array of another device
+            await Device.updateOne(
+              { fcmTokens: invalidToken },
+              { $pull: { fcmTokens: invalidToken } }
+            );
+          }
+        }
+        console.log('Cleaned up invalid tokens');
       }
     }
 

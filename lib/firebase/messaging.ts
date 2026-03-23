@@ -160,6 +160,7 @@ export async function sendNotificationToAllDevices(
       body,
       image: fcmImageUrl,
     },
+    data: Object.keys(dataPayload).length > 0 ? dataPayload : undefined,
     webpush: {
       notification: {
         icon: '/icons/icon-192.png',

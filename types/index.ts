@@ -90,6 +90,7 @@ export interface FCMMessage {
     body: string;
     image?: string;
   };
+  data?: Record<string, string>; // For Android/data payload
   webpush?: {
     notification?: {
       icon?: string;
