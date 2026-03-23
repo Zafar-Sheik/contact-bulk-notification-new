@@ -153,6 +153,8 @@ export async function sendNotificationToAllDevices(
   if (link) {
     dataPayload.url = link;
   }
+  // Add flag to prevent duplicate notifications when app is in foreground
+  dataPayload.foreground = 'true';
 
   const message: FCMMessage = {
     notification: {
