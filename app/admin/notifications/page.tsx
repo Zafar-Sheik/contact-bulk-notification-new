@@ -34,6 +34,8 @@ export default function NotificationsPage() {
   const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
+  const [selectedNotifications, setSelectedNotifications] = useState<string[]>([]);
+  const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
 
   useEffect(() => {
     fetchNotifications();
@@ -74,6 +76,7 @@ export default function NotificationsPage() {
         const data = await response.json();
         setSuccess(`Cleared ${data.deletedCount} notifications`);
         setNotifications([]);
+        setSelectedNotifications([]);
         setStats({ total: 0, sent: 0, failed: 0, scheduled: 0, pending: 0 });
         setShowClearConfirm(false);
       } else {
@@ -108,6 +111,43 @@ export default function NotificationsPage() {
     );
   };
 
+  const handleSelectAll = () => {
+    if (selectedNotifications.length === notifications.length)
+      setSelectedNotifications([]);
+    else
+      setSelectedNotifications(notifications.map(n => n._id));
+  };
+
+  const handleSelectNotification = (notificationId: string) => {
+    setSelectedNotifications(prev =>
+      prev.includes(notificationId)
+        ? prev.filter(id => id !== notificationId)
+        : [...prev, notificationId]
+    );
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedNotifications.length === 0) return;
+
+    setBulkDeleteLoading(true);
+    try {
+      const response = await fetch('/api/admin/notifications/bulk-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedNotifications }),
+      });
+
+      if (response.ok) {
+        setSelectedNotifications([]);
+        fetchNotifications();
+      }
+    } catch (error) {
+      console.error('Error bulk deleting notifications:', error);
+    } finally {
+      setBulkDeleteLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -117,15 +157,29 @@ export default function NotificationsPage() {
           <p className="text-gray-500 mt-1">View all sent and scheduled notifications</p>
         </div>
         {notifications.length > 0 && (
-          <button
-            onClick={() => setShowClearConfirm(true)}
-            className="px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 transition-colors flex items-center gap-2"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-            Clear History
-          </button>
+          <div className="flex gap-2">
+            {selectedNotifications.length > 0 && (
+              <button
+                onClick={handleBulkDelete}
+                disabled={bulkDeleteLoading}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                {bulkDeleteLoading ? 'Deleting...' : `Delete (${selectedNotifications.length})`}
+              </button>
+            )}
+            <button
+              onClick={() => setShowClearConfirm(true)}
+              className="px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 transition-colors flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Clear History
+            </button>
+          </div>
         )}
       </div>
 
@@ -301,6 +355,14 @@ export default function NotificationsPage() {
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
+                    <th className="px-4 py-4 text-left">
+                      <input
+                        type="checkbox"
+                        checked={selectedNotifications.length === notifications.length && notifications.length > 0}
+                        onChange={handleSelectAll}
+                        className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                      />
+                    </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                       Image
                     </th>
@@ -325,9 +387,17 @@ export default function NotificationsPage() {
                   {notifications.map((notification) => (
                     <tr 
                       key={notification._id} 
-                      className="hover:bg-gray-50/50 cursor-pointer transition-colors"
-                      onClick={() => setSelectedNotification(notification)}
+                      className={`hover:bg-gray-50/50 transition-colors ${selectedNotifications.includes(notification._id) ? 'bg-blue-50' : 'cursor-pointer'}`}
+                      onClick={() => !selectedNotifications.includes(notification._id) && setSelectedNotification(notification)}
                     >
+                      <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedNotifications.includes(notification._id)}
+                          onChange={() => handleSelectNotification(notification._id)}
+                          className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                        />
+                      </td>
                       <td className="px-6 py-4">
                         {notification.image ? (
                           <img

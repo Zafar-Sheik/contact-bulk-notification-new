@@ -3,6 +3,7 @@ import { connectDB } from '@/lib/db';
 import { Device } from '@/lib/models';
 import { parseUserAgent } from '@/lib/utils/helpers';
 import type { DeviceRegistrationBody } from '@/types';
+import { v4 as uuidv4 } from 'uuid';
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,14 +20,29 @@ export async function POST(request: NextRequest) {
     // Connect to database
     await connectDB();
 
+    // Get or generate a persistent device ID
+    // This helps identify the same device even if FCM token changes
+    const clientDeviceId = deviceInfo?.deviceId || request.headers.get('x-device-id');
+    let deviceId = clientDeviceId;
+
     // Parse user agent if not provided
     const userAgent = deviceInfo?.userAgent || request.headers.get('user-agent') || '';
     const { platform, browser } = deviceInfo?.platform 
       ? { platform: deviceInfo.platform, browser: deviceInfo.browser || 'unknown' }
       : parseUserAgent(userAgent);
 
-    // Check if device already exists
-    const existingDevice = await Device.findOne({ fcmToken });
+    // Check if device already exists by deviceId or fcmToken
+    let existingDevice = null;
+    
+    if (deviceId) {
+      // First check by persistent deviceId
+      existingDevice = await Device.findOne({ deviceId });
+    }
+    
+    // Also check by FCM token (for devices registered before deviceId was added)
+    if (!existingDevice) {
+      existingDevice = await Device.findOne({ fcmToken });
+    }
 
     if (existingDevice) {
       // Initialize metadata if it doesn't exist (for backward compatibility)
@@ -46,6 +62,16 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // Update FCM token if it changed (token refresh)
+      if (existingDevice.fcmToken !== fcmToken) {
+        existingDevice.fcmToken = fcmToken;
+      }
+
+      // Update deviceId if not set
+      if (!existingDevice.deviceId && deviceId) {
+        existingDevice.deviceId = deviceId;
+      }
+
       // Update province if provided
       if (province) {
         existingDevice.province = province;
@@ -56,12 +82,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         message: 'Device updated successfully',
-        deviceId: existingDevice._id,
+        deviceId: existingDevice.deviceId || existingDevice._id.toString(),
       });
+    }
+
+    // Generate a new deviceId if not provided
+    if (!deviceId) {
+      deviceId = uuidv4();
     }
 
     // Create new device
     const device = new Device({
+      deviceId,
       fcmToken,
       province: province || 'unknown',
       deviceInfo: {

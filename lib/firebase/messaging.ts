@@ -132,7 +132,8 @@ export async function sendNotificationToAllDevices(
   title: string,
   body: string,
   imageUrl?: string,
-  link?: string
+  link?: string,
+  notificationId?: string
 ): Promise<SendResult> {
   // For Android, we need to compress the image to stay under 4KB payload limit
   let fcmImageUrl = imageUrl;
@@ -142,6 +143,15 @@ export async function sendNotificationToAllDevices(
     if (compressedImage) {
       fcmImageUrl = compressedImage;
     }
+  }
+
+  // Build data payload with notification ID for deep linking
+  const dataPayload: Record<string, string> = {};
+  if (notificationId) {
+    dataPayload.notificationId = notificationId;
+  }
+  if (link) {
+    dataPayload.url = link;
   }
 
   const message: FCMMessage = {
@@ -160,7 +170,7 @@ export async function sendNotificationToAllDevices(
         image: fcmImageUrl,
       },
       fcmOptions: link ? { link } : undefined,
-      data: link ? { url: link } : undefined,
+      data: Object.keys(dataPayload).length > 0 ? dataPayload : undefined,
     },
     tokens,
   };

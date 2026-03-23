@@ -61,9 +61,16 @@ self.addEventListener('notificationclick', (event) => {
   }
 
   // Get the URL to open from notification data
-  const linkUrl = event.notification.data?.url || 
-                  event.notification.data?.link || 
-                  '/';
+  // Check for notificationId first to create a deep link
+  const notificationId = event.notification.data?.notificationId;
+  let linkUrl = event.notification.data?.url || 
+                event.notification.data?.link || 
+                '/';
+  
+  // If we have a notificationId, create a deep link to view that specific notification
+  if (notificationId) {
+    linkUrl = `/?notification=${notificationId}`;
+  }
 
   // Ensure URL is absolute (add origin if relative)
   let urlToOpen = linkUrl;

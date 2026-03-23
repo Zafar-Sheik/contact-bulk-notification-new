@@ -67,21 +67,8 @@ export async function POST(request: NextRequest) {
     const tokens = devices.map((d) => d.fcmToken);
     console.log('FCM tokens:', tokens.length);
 
-    // Send notifications
-    console.log('Sending notifications via FCM...');
-    const result = await sendNotificationToAllDevices(
-      tokens,
-      title,
-      message,
-      image,
-      link
-    );
-    console.log('FCM result:', result);
-
     // Save to notification history first (to get the _id)
     const sentAt = new Date();
-    // Determine status: 'sent' if at least one succeeded, 'failed' if all failed
-    const status = result.success > 0 ? 'sent' : 'failed';
     
     const notification = new Notification({
       title,
@@ -89,12 +76,34 @@ export async function POST(request: NextRequest) {
       imageUrl: image || '',
       link: link || '',
       sentAt,
-      status,
-      sentCount: result.success,
+      status: 'sent', // Start with sent, will update if all fail
+      sentCount: 0,
       sentByAdmin: session.username,
     });
 
     await notification.save();
+    
+    // Get the notification ID to include in the push notification
+    const notificationId = notification._id.toString();
+
+    // Send notifications with the notification ID for deep linking
+    console.log('Sending notifications via FCM...');
+    const result = await sendNotificationToAllDevices(
+      tokens,
+      title,
+      message,
+      image,
+      link,
+      notificationId
+    );
+    console.log('FCM result:', result);
+    
+    // Update the notification with the actual send result
+    const finalStatus = result.success > 0 ? 'sent' : 'failed';
+    await Notification.findByIdAndUpdate(notification._id, {
+      status: finalStatus,
+      sentCount: result.success,
+    });
 
     // Record notification history for each device that received it
     const notificationEntry = {
