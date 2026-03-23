@@ -179,7 +179,8 @@ export async function sendNotificationToAllDevices(
       notification: {
         icon: '/icons/icon-192.png',
         badge: '/icons/icon-192.png',
-        tag: 'notification',
+        // Use unique tag to prevent duplicate notifications on iOS
+        tag: notificationId || 'notification',
         title,
         body,
         image: fcmImageUrl,
