@@ -4,6 +4,7 @@ import mongoose, { Schema, Document } from 'mongoose';
  * Device Interface - Unified model for device registration and notification sending
  */
 export interface IDevice extends Document {
+  deviceId?: string;
   fcmToken: string;
   province: 'Gauteng' | 'KwaZulu-Natal' | 'Western Cape' | 'Eastern Cape' | 'Free State' | 'Limpopo' | 'Mpumalanga' | 'North West' | 'Northern Cape' | 'unknown';
   deviceInfo: {
@@ -33,6 +34,11 @@ export interface IDevice extends Document {
 
 const DeviceSchema = new Schema<IDevice>(
   {
+    deviceId: {
+      type: String,
+      unique: true,
+      sparse: true, // Allows null values for existing documents
+    },
     fcmToken: {
       type: String,
       required: [true, 'FCM token is required'],
@@ -109,6 +115,7 @@ const DeviceSchema = new Schema<IDevice>(
 );
 
 // Indexes for efficient queries
+DeviceSchema.index({ deviceId: 1 });
 DeviceSchema.index({ province: 1 });
 DeviceSchema.index({ 'deviceInfo.platform': 1 });
 DeviceSchema.index({ 'deviceInfo.browser': 1 });

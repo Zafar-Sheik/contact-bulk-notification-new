@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import { getToken, getMessaging } from 'firebase/messaging';
 import { initFirebase, firebaseConfig } from '@/lib/firebase/client';
 
@@ -156,6 +157,9 @@ export function useDeviceRegistration() {
   // Send token to API
   const sendToAPI = useCallback(async (token: string, deviceInfo: DeviceInfo, province?: string): Promise<RegistrationResult> => {
     try {
+      // Get persistent device ID
+      const deviceId = typeof window !== 'undefined' ? localStorage.getItem('deviceId') : null;
+      
       const response = await fetch('/api/devices/register', {
         method: 'POST',
         headers: {
@@ -163,6 +167,7 @@ export function useDeviceRegistration() {
         },
         body: JSON.stringify({
           fcmToken: token,
+          deviceId: deviceId || undefined,
           browser: deviceInfo.browser,
           platform: deviceInfo.platform,
           os: deviceInfo.os,

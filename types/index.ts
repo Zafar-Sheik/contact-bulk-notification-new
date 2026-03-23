@@ -46,6 +46,7 @@ export interface DeviceRegistrationBody {
   fcmToken: string;
   province?: string;
   deviceInfo: {
+    deviceId?: string;
     platform: 'android' | 'ios' | 'windows' | 'mac' | 'linux' | 'unknown';
     browser: string;
     userAgent: string;

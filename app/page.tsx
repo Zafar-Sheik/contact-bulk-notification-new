@@ -84,6 +84,54 @@ export default function HomePage() {
     fetchNotifications();
   }, []);
 
+  // Handle deep linking - check for notification query param
+  useEffect(() => {
+    const handleDeepLink = async () => {
+      // Check URL for notification query param
+      const urlParams = new URLSearchParams(window.location.search);
+      const notificationId = urlParams.get('notification');
+      
+      if (notificationId) {
+        // Fetch the specific notification
+        try {
+          const response = await fetch(`/api/notifications/${notificationId}`);
+          const data = await response.json();
+          if (data.success && data.notification) {
+            setSelectedNotification(data.notification);
+            setIsModalOpen(true);
+            // Clear the URL param after opening
+            window.history.replaceState({}, document.title, '/');
+          }
+        } catch (error) {
+          console.error('Failed to fetch notification:', error);
+        }
+      }
+    };
+
+    handleDeepLink();
+
+    // Listen for messages from service worker (for when app is already open)
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'NAVIGATE_TO') {
+        const url = new URL(event.data.url);
+        const notificationId = url.searchParams.get('notification');
+        if (notificationId) {
+          handleDeepLink();
+        }
+      }
+    };
+
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', handleMessage);
+    }
+
+    return () => {
+      if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', handleMessage);
+      }
+    };
+  }, []);
+
   const handleNotificationClick = (notification: Notification) => {
     setSelectedNotification(notification);
     setIsModalOpen(true);
