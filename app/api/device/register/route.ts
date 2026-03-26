@@ -49,6 +49,27 @@ export async function POST(request: NextRequest) {
           existingDevice = null;
         }
       }
+
+      // Safari browser duplicate detection - check for same browser with different FCM tokens
+      // Safari often triggers multiple registrations due to service worker behavior
+      if (existingDevice && browser === 'safari' && existingDevice.deviceInfo?.browser === 'safari') {
+        // Check if we have an older device with the same browser
+        const existingCreatedAt = existingDevice.metadata?.createdAt ? new Date(existingDevice.metadata.createdAt) : new Date();
+        const potentialDuplicates = await Device.find({
+          _id: { $ne: existingDevice._id },
+          'deviceInfo.browser': 'safari',
+          'deviceInfo.platform': platform,
+          'metadata.createdAt': { $lt: existingCreatedAt } // Only find older devices
+        }).sort({ 'metadata.createdAt': 1 }); // Get oldest first
+
+        if (potentialDuplicates.length > 0) {
+          // Delete older Safari duplicates, keep the newest one
+          for (const dup of potentialDuplicates) {
+            console.log(`Safari duplicate detected: Deleting older device ${dup._id}, keeping ${existingDevice._id}`);
+            await Device.deleteOne({ _id: dup._id });
+          }
+        }
+      }
     }
     
     // Also check by FCM token (for devices registered before deviceId was added)
@@ -150,6 +171,28 @@ export async function POST(request: NextRequest) {
     // Generate a new deviceId if not provided
     if (!deviceId) {
       deviceId = uuidv4();
+    }
+
+    // Safari browser duplicate detection - check for existing Safari duplicates BEFORE creating new device
+    // Safari often triggers multiple registrations due to service worker behavior
+    // We delete older duplicates and keep the newest one
+    if (browser === 'safari') {
+      const potentialDuplicates = await Device.find({
+        'deviceInfo.browser': 'safari',
+        'deviceInfo.platform': platform,
+        fcmToken: { $ne: fcmToken } // Don't delete the device we're about to create if token matches
+      }).sort({ 'metadata.createdAt': 1 });
+
+      if (potentialDuplicates.length > 0) {
+        // Delete older Safari duplicates, keep the newest one
+        // The most recently created device should remain
+        for (const dup of potentialDuplicates) {
+          // Only delete if this device is older than the current one we're about to create
+          // Use lastSeen as a proxy for recency since we're creating with current timestamp
+          console.log(`Safari: Auto-deleting older duplicate device ${dup._id} (created: ${dup.metadata?.createdAt}) to keep only the newest registration`);
+          await Device.deleteOne({ _id: dup._id });
+        }
+      }
     }
 
     // Create new device

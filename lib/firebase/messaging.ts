@@ -25,8 +25,6 @@ export async function sendPushNotification(
     return { success: 0, failed: 0 };
   }
 
-  console.log('FCM: Sending to', tokens.length, 'tokens');
-  
   let successCount = 0;
   let failedCount = 0;
   const errors: Array<{ index: number; error: string }> = [];
@@ -40,14 +38,12 @@ export async function sendPushNotification(
     // Create a promise for each batch
     batchPromises.push((async () => {
       try {
-        console.log('FCM: Sending batch', Math.floor(i / BATCH_SIZE) + 1, 'of', Math.ceil(tokens.length / BATCH_SIZE));
         const response = await getMessaging().sendEachForMulticast({
           notification: message.notification,
           webpush: message.webpush,
           tokens: batchTokens,
         });
         
-        console.log('FCM: Batch result - success:', response.successCount, 'failure:', response.failureCount);
         successCount += response.successCount;
         failedCount += response.failureCount;
 
@@ -56,21 +52,14 @@ export async function sendPushNotification(
           response.responses.forEach((resp, idx) => {
             if (!resp.success) {
               const errorMsg = resp.error?.message || 'Unknown error';
-              console.log('FCM: Token index', i + idx, 'failed:', errorMsg);
               errors.push({
                 index: i + idx,
                 error: errorMsg,
               });
-              
-              // Handle invalid tokens - mark for removal
-              if (errorMsg.includes('NOT_FOUND') || errorMsg.includes('NotRegistered') || errorMsg.includes('Invalid')) {
-                console.log('FCM: Invalid token detected at index', i + idx);
-              }
             }
           });
         }
       } catch (error) {
-        console.error(`Error sending batch ${i / BATCH_SIZE + 1}:`, error);
         failedCount += batchTokens.length;
       }
     })());
@@ -96,36 +85,27 @@ async function compressImageForFCM(imageDataUrl: string): Promise<string | null>
     const base64Data = imageDataUrl.replace(/^data:image\/\w+;base64,/, '');
     const imageBuffer = Buffer.from(base64Data, 'base64');
     
-    // Aggressive compression - start small and reduce quality
-    // FCM notification payload limit is 4KB
+    // Skip compression for Android - FCM can fetch from URL
+    // Only compress for web/pwa which has 4KB payload limit
+    // For base64 images, we still compress but with faster settings
     
-    // Try 1: 100x100 with moderate quality
-    const img1 = await sharp(imageBuffer)
-      .resize(100, 100, { fit: 'inside', withoutEnlargement: true })
-      .webp({ quality: 60 })
-      .toBuffer();
-    
-    if (img1.length <= 4000) {
-      return `data:image/webp;base64,${img1.toString('base64')}`;
-    }
-    
-    // Try 2: 80x80 with lower quality
-    const img2 = await sharp(imageBuffer)
-      .resize(80, 80, { fit: 'inside', withoutEnlargement: true })
-      .webp({ quality: 50 })
-      .toBuffer();
-    
-    if (img2.length <= 4000) {
-      return `data:image/webp;base64,${img2.toString('base64')}`;
-    }
-    
-    // Try 3: 60x60 with low quality
-    const img3 = await sharp(imageBuffer)
+    // Fast compression - single pass with smaller size
+    const img = await sharp(imageBuffer)
       .resize(60, 60, { fit: 'inside', withoutEnlargement: true })
       .webp({ quality: 40 })
       .toBuffer();
     
-    return `data:image/webp;base64,${img3.toString('base64')}`;
+    if (img.length <= 4000) {
+      return `data:image/webp;base64,${img.toString('base64')}`;
+    }
+    
+    // If still too large, try even smaller
+    const img2 = await sharp(imageBuffer)
+      .resize(40, 40, { fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: 30 })
+      .toBuffer();
+    
+    return `data:image/webp;base64,${img2.toString('base64')}`;
   } catch (error) {
     console.error('Failed to compress image for FCM:', error);
     return null;
