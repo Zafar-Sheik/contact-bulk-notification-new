@@ -19,47 +19,53 @@ const messaging = firebase.messaging();
 
 // Handle background push notifications
 messaging.onBackgroundMessage((payload) => {
-  console.log('[firebase-messaging-sw.js] Received background message:', payload);
-
-  // Only show notification if it doesn't have 'foreground' flag in data
-  // This prevents duplicates when the app is in foreground
+  // Skip if app is in foreground - the foreground handler will show the notification
+  // This prevents duplicate notifications on iOS devices
   if (payload.data?.foreground === 'true') {
-    console.log('[firebase-messaging-sw.js] Skipping background display - foreground will handle it');
     return;
   }
 
-  // Extract notification data
-  const notificationTitle = payload.notification?.title || 'Notification';
-  const notificationOptions = {
-    body: payload.notification?.body || '',
-    icon: payload.notification?.image || '/icons/icon-192.png',
-    badge: '/icons/icon-192.png',
-    // Use unique tag from data to prevent duplicate notifications on iOS
-    tag: payload.data?.notificationId || 'firebase-notification',
-    data: payload.data || {},
-    actions: [
-      {
-        action: 'open',
-        title: 'Open'
-      },
-      {
-        action: 'close',
-        title: 'Close'
-      }
-    ],
-    vibrate: [100, 50, 100],
-    requireInteraction: true,
-    persistent: true
-  };
+  // iOS Safari in PWA mode: Check if there's an active client (app is in foreground)
+  // If so, skip showing notification to prevent duplicates
+  clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+    const activeClient = clientList.find(client => 
+      client.url.startsWith(self.location.origin)
+    );
+    
+    // If app is in foreground/active, skip showing notification
+    if (activeClient) {
+      return;
+    }
 
-  // Show notification
-  self.registration.showNotification(notificationTitle, notificationOptions);
+    // Extract notification data - use notificationId as unique tag for iOS
+    const notificationId = payload.data?.notificationId || `notification-${Date.now()}`;
+    const notificationTitle = payload.notification?.title || 'Notification';
+    const notificationOptions = {
+      body: payload.notification?.body || '',
+      icon: payload.notification?.image || '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
+      // Use unique tag with notificationId to prevent duplicate notifications on iOS
+      tag: notificationId,
+      data: payload.data || {},
+      actions: [
+        {
+          action: 'open',
+          title: 'Open'
+        },
+        {
+          action: 'close',
+          title: 'Close'
+        }
+      ],
+    };
+
+    // Show notification
+    self.registration.showNotification(notificationTitle, notificationOptions);
+  });
 });
 
 // Handle notification click
 self.addEventListener('notificationclick', (event) => {
-  console.log('[firebase-messaging-sw.js] Notification clicked:', event);
-
   // Prevent default behavior
   event.notification.close();
 
@@ -118,7 +124,6 @@ self.addEventListener('notificationclick', (event) => {
         return clients.openWindow(urlToOpen);
       }
     }).catch((error) => {
-      console.error('[firebase-messaging-sw.js] Error handling notification click:', error);
       // Fallback: open the window
       return clients.openWindow(urlToOpen);
     })
@@ -127,13 +132,11 @@ self.addEventListener('notificationclick', (event) => {
 
 // Handle notification close
 self.addEventListener('notificationclose', (event) => {
-  console.log('[firebase-messaging-sw.js] Notification closed:', event);
+  // Notification was closed by user
 });
 
 // Handle push event (fallback for non-FCM push)
 self.addEventListener('push', (event) => {
-  console.log('[firebase-messaging-sw.js] Push event received:', event);
-
   // Check if it's a Firebase message
   if (event.data) {
     try {
@@ -164,8 +167,6 @@ self.addEventListener('push', (event) => {
 
 // Handle message event (foreground messages)
 self.addEventListener('message', (event) => {
-  console.log('[firebase-messaging-sw.js] Message event:', event);
-
   // Handle different message types
   if (event.data && event.data.type) {
     switch (event.data.type) {
@@ -184,14 +185,11 @@ const CACHE_NAME = 'firebase-messaging-sw-v1';
 
 // Install event
 self.addEventListener('install', (event) => {
-  console.log('[firebase-messaging-sw.js] Service Worker installing.');
   self.skipWaiting(); // Activate immediately
 });
 
 // Activate event
 self.addEventListener('activate', (event) => {
-  console.log('[firebase-messaging-sw.js] Service Worker activating.');
-  
   // Clean up old caches
   event.waitUntil(
     caches.keys().then((cacheNames) => {
