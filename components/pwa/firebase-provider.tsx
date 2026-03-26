@@ -110,26 +110,76 @@ export function PWAProvider({ children }: PWAProviderProps) {
     autoRegister();
   }, [isReady, isSupported, permission, token]);
 
-  // Listen for foreground messages and display them
+  // Auto-request notification permission on first install
+  useEffect(() => {
+    if (!isReady || !isSupported) return;
+    
+    // Check if this is the first time the user is visiting
+    const hasRequestedPermission = localStorage.getItem('permissionRequested');
+    const isRegistered = localStorage.getItem('deviceRegistered');
+    
+    // Auto-request permission if never requested and not registered
+    if (!hasRequestedPermission && !isRegistered && permission !== 'denied' && permission !== 'granted') {
+      const requestPermission = async () => {
+        try {
+          setIsRegistering(true);
+          localStorage.setItem('permissionRequested', 'true');
+          
+          // Request permission from browser
+          const newPermission = await requestNotificationPermission();
+          setPermission(newPermission);
+          
+          if (newPermission === 'granted') {
+            // Get FCM token after permission is granted
+            const fcmToken = await getFcmToken();
+            
+            if (fcmToken) {
+              setToken(fcmToken);
+              
+              // Get province from localStorage if available
+              const savedProvince = localStorage.getItem('userProvince') || undefined;
+              
+              // Register device with backend
+              const response = await fetch('/api/device/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fcmToken, province: savedProvince }),
+              });
+
+              if (response.ok) {
+                const data = await response.json();
+                console.log('Device auto-registered on first visit:', data);
+                localStorage.setItem('deviceRegistered', 'true');
+                localStorage.setItem('fcmToken', fcmToken);
+              }
+            }
+          }
+        } catch (err) {
+          console.error('Auto permission request error:', err);
+        } finally {
+          setIsRegistering(false);
+        }
+      };
+
+      // Delay the request slightly to ensure the UI is ready
+      requestPermission();
+    }
+  }, [isReady, isSupported, permission]);
+
+  // Listen for foreground messages - don't show duplicate notifications on iOS
+  // Firebase SDK handles foreground notifications natively on iOS
   useEffect(() => {
     if (!isReady || !isSupported) return;
 
     const unsubscribe = onForegroundMessage((payload) => {
+      // On iOS, Firebase SDK handles foreground notifications automatically
+      // Don't show manual notifications to prevent duplicates
+      const payloadObj = payload as { data?: Record<string, unknown> };
+      
+      // Only log - don't show manual notification on iOS to prevent duplicates
       console.log('Foreground message received:', payload);
       
-      // Show notification when app is in foreground
-      const payloadObj = payload as { notification?: { title?: string; body?: string; image?: string }; data?: Record<string, unknown> };
-      if (payloadObj && payloadObj.notification) {
-        // Display the notification using the browser's Notification API
-        if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification(payloadObj.notification.title || 'Notification', {
-            body: payloadObj.notification.body || '',
-            icon: payloadObj.notification.image || '/icons/icon-192.png',
-            tag: (payloadObj.data?.notificationId as string) || 'notification',
-            data: payloadObj.data || {}
-          });
-        }
-      }
+      // Optionally handle data-only messages here if needed
     });
 
     return () => {

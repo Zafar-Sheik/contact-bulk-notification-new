@@ -125,17 +125,17 @@ export async function sendNotificationToAllDevices(
 ): Promise<SendResult> {
   // For Android/FCM, we need to compress the image to stay under 4KB payload limit
   let fcmImageUrl = imageUrl;
+  
+  // Skip compression for URL images - FCM can fetch from URL on Android
+  // Only compress base64 images which are already embedded
   if (imageUrl && imageUrl.startsWith('data:')) {
-    // Image is base64 encoded - compress it for FCM
-    console.log('Compressing base64 image for FCM...');
+    // Fast compression for base64 images
     const compressedImage = await compressImageForFCM(imageUrl);
     if (compressedImage) {
       fcmImageUrl = compressedImage;
-      console.log('Image compressed successfully');
     }
   } else if (imageUrl && imageUrl.startsWith('http')) {
-    // For URL images, use a smaller thumbnail for push notification
-    // FCM can fetch the full image from URL for Android, but we use a small one for webpush
+    // URL images are handled directly by FCM - no compression needed
     fcmImageUrl = imageUrl;
   }
 
