@@ -75,8 +75,20 @@ export async function POST(request: NextRequest) {
     };
 
     // Filter by province if specified (and not "All")
+    // Include devices with the specified province OR devices with no province (unknown)
     if (targetProvince && targetProvince !== 'All') {
-      deviceQuery.province = targetProvince;
+      deviceQuery.$and = [
+        {
+          $or: [
+            { province: targetProvince },
+            { province: { $exists: false } },
+            { province: null },
+            { province: 'unknown' }
+          ]
+        }
+      ];
+      // Remove the $or from the top level when we add $and
+      delete deviceQuery.$or;
     }
 
     // Get all active device tokens (including devices without metadata for backward compatibility)
