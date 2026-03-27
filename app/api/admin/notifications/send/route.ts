@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     await connectDB();
 
     const body: SendNotificationBody = await request.json();
-    const { title, message, image, link, scheduledAt } = body;
+    const { title, message, image, link, scheduledAt, targetProvince } = body;
 
     // Validate notification payload
     const validation = validateNotificationPayload({ title, message });
@@ -40,6 +40,7 @@ export async function POST(request: NextRequest) {
         status: 'scheduled',
         sentCount: 0,
         sentByAdmin: session.username,
+        targetProvince: targetProvince || 'All',
       });
 
       await notification.save();
@@ -53,7 +54,22 @@ export async function POST(request: NextRequest) {
 
     // Get all active device tokens (including additional tokens in fcmTokens array)
     console.log('Fetching active devices...');
-    const devices = await Device.find({ 'metadata.isActive': true }).lean().select('fcmToken fcmTokens') as { fcmToken: string; fcmTokens?: string[] }[];
+    
+    // Build query based on targetProvince
+    const deviceQuery: Record<string, unknown> = { 'metadata.isActive': true };
+    
+    // Filter by province if specified (and not "All")
+    // Include devices with the specified province OR devices with no province (unknown)
+    if (targetProvince && targetProvince !== 'All') {
+      deviceQuery.$or = [
+        { province: targetProvince },
+        { province: { $exists: false } },
+        { province: null },
+        { province: 'unknown' }
+      ];
+    }
+    
+    const devices = await Device.find(deviceQuery).lean().select('fcmToken fcmTokens province') as { fcmToken: string; fcmTokens?: string[]; province?: string }[];
     console.log('Found devices:', devices.length);
     
     if (devices.length === 0) {
@@ -95,6 +111,7 @@ export async function POST(request: NextRequest) {
       status: 'sent', // Start with sent, will update if all fail
       sentCount: 0,
       sentByAdmin: session.username,
+      targetProvince: targetProvince || 'All',
     });
 
     await notification.save();
