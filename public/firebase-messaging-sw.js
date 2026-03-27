@@ -51,9 +51,9 @@ self.addEventListener("push", (event) => {
       
       self.registration.showNotification(title, {
         body: data.body,
-        icon: "/icons/icon-192.png",
+        icon: "/icons/icon-192.svg",
         image: data.image,
-        badge: "/icons/icon-192.png",
+        badge: "/icons/icon-192.svg",
         tag: data.notificationId || 'notification',
         renotify: true,
         data: {
@@ -75,8 +75,16 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
-  // Get URL from notification data with fallback
-  const url = event.notification.data?.url || '/';
+  // Get URL from notification data with notificationId for deep linking
+  const baseUrl = event.notification.data?.url || '/';
+  const notificationId = event.notification.data?.notificationId;
+  
+  // Build the URL with notification ID as query param to open the modal
+  let url = baseUrl;
+  if (notificationId) {
+    const separator = baseUrl.includes('?') ? '&' : '?';
+    url = `${baseUrl}${separator}notification=${notificationId}`;
+  }
   
   event.waitUntil(
     clients.openWindow(url)
