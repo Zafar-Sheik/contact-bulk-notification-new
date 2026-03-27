@@ -165,12 +165,31 @@ export default function HomePage() {
     selectProvince(newProvince as Province);
     setProvinceConfirm(newProvince);
     
-    // Re-register device with new province if token exists
+    // Save to localStorage
+    localStorage.setItem('userProvince', newProvince);
+    
+    // Update device in database if token exists - use dedicated province endpoint for immediate update
     if (token) {
       try {
-        await registerDevice(newProvince);
+        const response = await fetch('/api/device/province', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fcmToken: token, province: newProvince }),
+        });
+        
+        if (!response.ok) {
+          // Fallback to register device if province endpoint fails
+          console.warn('Province update failed, falling back to register');
+          await registerDevice(newProvince);
+        }
       } catch (err) {
         console.error('Failed to update province:', err);
+        // Fallback to register device
+        try {
+          await registerDevice(newProvince);
+        } catch (fallbackErr) {
+          console.error('Fallback registration also failed:', fallbackErr);
+        }
       }
     }
     
