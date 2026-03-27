@@ -32,14 +32,19 @@ export async function sendPushNotification(
   // Process tokens in batches of 500 - using parallel processing for faster delivery
   const batchPromises: Promise<void>[] = [];
   
+  console.log("Sending notification to:", tokens.length, "devices");
+  
   for (let i = 0; i < tokens.length; i += BATCH_SIZE) {
     const batchTokens = tokens.slice(i, i + BATCH_SIZE);
+    console.log("Sending batch:", batchTokens.length, "tokens, batch index:", i / BATCH_SIZE);
     
     // Create a promise for each batch
     batchPromises.push((async () => {
       try {
+        // Use data-only payload for full control
+        // This ensures no automatic notification display by FCM
         const response = await getMessaging().sendEachForMulticast({
-          notification: message.notification,
+          data: message.data,
           webpush: message.webpush,
           tokens: batchTokens,
         });
@@ -139,34 +144,28 @@ export async function sendNotificationToAllDevices(
     fcmImageUrl = imageUrl;
   }
 
-  // Build data payload with notification ID for deep linking
-  const dataPayload: Record<string, string> = {};
+  // Build data payload - DATA ONLY (no notification object)
+  // This gives us full control over notification display on all platforms
+  const dataPayload: Record<string, string> = {
+    title: title,
+    body: body,
+    image: fcmImageUrl || '',
+    link: link || '/',
+    foreground: 'false',
+  };
   if (notificationId) {
     dataPayload.notificationId = notificationId;
   }
-  if (link) {
-    dataPayload.url = link;
-  }
 
   const message: FCMMessage = {
-    notification: {
-      title,
-      body,
-      image: fcmImageUrl,
-    },
-    data: Object.keys(dataPayload).length > 0 ? dataPayload : undefined,
+    // NO notification field - all data sent via data payload
+    // Service worker handles notification display
+    data: dataPayload,
     webpush: {
-      notification: {
-        icon: '/icons/icon-192.png',
-        badge: '/icons/icon-192.png',
-        // Use unique tag to prevent duplicate notifications on iOS
-        tag: notificationId || 'notification',
-        title,
-        body,
-        image: fcmImageUrl,
+      // Set high urgency for Android when app is closed
+      headers: {
+        Urgency: 'high',
       },
-      fcmOptions: link ? { link } : undefined,
-      data: Object.keys(dataPayload).length > 0 ? dataPayload : undefined,
     },
     tokens,
   };

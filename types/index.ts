@@ -85,13 +85,18 @@ export interface PushSubscription {
 }
 
 export interface FCMMessage {
-  notification: {
+  // notification is optional - if not present, it's a data-only message
+  // Data-only messages must be handled manually in service worker
+  notification?: {
     title: string;
     body: string;
     image?: string;
   };
-  data?: Record<string, string>; // For Android/data payload
+  data?: Record<string, string>; // For data payload
   webpush?: {
+    headers?: {
+      Urgency?: 'high' | 'normal' | 'low';
+    };
     notification?: {
       icon?: string;
       badge?: string;

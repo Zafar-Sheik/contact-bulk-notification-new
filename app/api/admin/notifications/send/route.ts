@@ -104,6 +104,7 @@ export async function POST(request: NextRequest) {
 
     // Send notifications with the notification ID for deep linking
     console.log('Sending notifications via FCM...');
+    console.log("Sending notification to:", tokens.length);
     const result = await sendNotificationToAllDevices(
       tokens,
       title,

@@ -11,6 +11,8 @@
   "lang": "en",
   "dir": "ltr",
   "categories": ["utilities", "notifications"],
+  "gcm_sender_id": "1094002262397",
+  "gcm_sender_id_comment": "MESSAGING_SENDER_ID - Required for Android push notifications",
   "icons": [
     {
       "src": "/icons/icon-192.svg",
