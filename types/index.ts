@@ -97,6 +97,7 @@ export interface FCMMessage {
     headers?: {
       Urgency?: 'high' | 'normal' | 'low';
     };
+    // notification is optional - data-only messages don't include it
     notification?: {
       icon?: string;
       badge?: string;
