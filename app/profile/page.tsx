@@ -4,6 +4,16 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePWA } from '@/components/pwa/firebase-provider';
 import { ProvinceSelector, useProvinceSelection, type Province } from '@/components/pwa/province-selector';
+import NotificationModal from '@/components/ui/NotificationModal';
+
+interface Notification {
+  _id: string;
+  title: string;
+  message: string;
+  image?: string;
+  link?: string;
+  sentAt?: string;
+}
 
 export default function ProfilePage() {
   const { 
@@ -26,6 +36,8 @@ export default function ProfilePage() {
   const [provinceConfirm, setProvinceConfirm] = useState<string | null>(null);
   const [isChangingProvince, setIsChangingProvince] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
+  const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -34,6 +46,59 @@ export default function ProfilePage() {
       setIsInstalled(true);
     }
   }, []);
+
+  // Handle deep linking - check for notification query param
+  useEffect(() => {
+    const handleDeepLink = async () => {
+      // Check URL for notification query param
+      const urlParams = new URLSearchParams(window.location.search);
+      const notificationId = urlParams.get('notification');
+      
+      if (notificationId) {
+        // Fetch the specific notification
+        try {
+          const response = await fetch(`/api/notifications/${notificationId}`);
+          const data = await response.json();
+          if (data.success && data.notification) {
+            setSelectedNotification(data.notification);
+            setIsModalOpen(true);
+            // Clear the URL param after opening
+            window.history.replaceState({}, document.title, '/profile');
+          }
+        } catch (error) {
+          console.error('Failed to fetch notification:', error);
+        }
+      }
+    };
+
+    handleDeepLink();
+
+    // Listen for messages from service worker
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'NAVIGATE_TO') {
+        const url = new URL(event.data.url);
+        const notificationId = url.searchParams.get('notification');
+        if (notificationId) {
+          handleDeepLink();
+        }
+      }
+    };
+
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', handleMessage);
+    }
+
+    return () => {
+      if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', handleMessage);
+      }
+    };
+  }, []);
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedNotification(null);
+  };
 
   const handleProvinceChange = async (selectedProvince: Province) => {
     setIsChangingProvince(true);
@@ -189,6 +254,13 @@ export default function ProfilePage() {
             isOpen={showSelector}
           />
         )}
+
+        {/* Notification Modal */}
+        <NotificationModal
+          isOpen={isModalOpen}
+          onClose={handleCloseModal}
+          notification={selectedNotification}
+        />
 
         {/* Bottom Navigation */}
         <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50">
