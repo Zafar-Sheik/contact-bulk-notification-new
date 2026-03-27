@@ -31,6 +31,9 @@ self.addEventListener("push", (event) => {
   try {
     const data = event.data.json();
     console.log('[FCM] Push data:', data);
+    console.log('[FCM] Title:', data.title);
+    console.log('[FCM] Body:', data.body);
+    console.log('[FCM] Image:', data.image);
     
     // Check if app is in foreground - skip if so
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
@@ -44,7 +47,9 @@ self.addEventListener("push", (event) => {
       }
       
       // Always manually show notification using the exact format requested
-      self.registration.showNotification(data.title, {
+      const title = data.title || 'Notification';
+      
+      self.registration.showNotification(title, {
         body: data.body,
         icon: "/icons/icon-192.png",
         image: data.image,

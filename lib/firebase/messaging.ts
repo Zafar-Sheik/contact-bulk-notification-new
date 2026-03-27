@@ -158,8 +158,8 @@ export async function sendNotificationToAllDevices(
   }
 
   const message: FCMMessage = {
-    // NO notification field - all data sent via data payload
-    // Service worker handles notification display
+    // Use data payload only - let service worker handle all notification display
+    // This prevents duplicate notifications on both iOS and Android
     data: dataPayload,
     webpush: {
       // Set high urgency for Android when app is closed
