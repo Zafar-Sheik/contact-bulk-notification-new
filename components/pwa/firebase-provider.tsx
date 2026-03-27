@@ -173,13 +173,17 @@ export function PWAProvider({ children }: PWAProviderProps) {
 
     const unsubscribe = onForegroundMessage((payload) => {
       // On iOS, Firebase SDK handles foreground notifications automatically
-      // Don't show manual notifications to prevent duplicates
-      const payloadObj = payload as { data?: Record<string, unknown> };
+      // We only log here - do NOT show manual notifications to prevent duplicates
+      console.log('[FCM] Foreground message received:', payload);
       
-      // Only log - don't show manual notification on iOS to prevent duplicates
-      console.log('Foreground message received:', payload);
+      // Handle any data-only messages if needed
+      const payloadObj = payload as { notification?: { title?: string; body?: string }; data?: Record<string, unknown> };
       
-      // Optionally handle data-only messages here if needed
+      // Only handle data-only messages (no notification object)
+      if (!payloadObj.notification || (!payloadObj.notification.title && !payloadObj.notification.body)) {
+        // This is a data-only message, you could handle it here if needed
+        console.log('[FCM] Data-only foreground message received');
+      }
     });
 
     return () => {
