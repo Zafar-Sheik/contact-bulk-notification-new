@@ -16,11 +16,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Title and message required' }, { status: 400 });
     }
 
-    // Get all devices
-    const devices = await Device.find({}).lean().select('fcmToken') as { fcmToken: string }[];
+    // Filter devices by province - if targetProvince is set, only send to those devices
+    let query = {};
+    if (targetProvince && targetProvince !== 'All') {
+      // Send to matching province OR devices with no province set
+      query = {
+        $or: [
+          { province: targetProvince },
+          { province: { $exists: false } },
+          { province: '' }
+        ]
+      };
+    }
+    
+    const devices = await Device.find(query).lean().select('fcmToken') as { fcmToken: string }[];
     
     if (devices.length === 0) {
-      return NextResponse.json({ error: 'No devices registered' }, { status: 400 });
+      return NextResponse.json({ error: 'No devices registered for this province' }, { status: 400 });
     }
 
     const tokens = devices.map(d => d.fcmToken).filter(Boolean);

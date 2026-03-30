@@ -37,6 +37,7 @@ const DeviceSchema = new Schema<IDevice>(
 );
 
 DeviceSchema.index({ fcmToken: 1 });
+DeviceSchema.index({ province: 1 });
 
 const Device = mongoose.models.Device || mongoose.model<IDevice>('Device', DeviceSchema);
 
