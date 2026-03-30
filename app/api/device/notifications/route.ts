@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
-import { Device, Notification } from '@/lib/models';
+import Device from '@/lib/models/device.model';
+import Notification from '@/lib/models/notification.model';
 
-/**
- * GET /api/device/notifications
- * Get notifications for a device based on its province
- * Query params: ?fcmToken=<token>
- */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -18,16 +14,16 @@ export async function GET(request: NextRequest) {
 
     await connectDB();
 
-    const device = await Device.findOne({ fcmToken });
+    const device = await Device.findOne({ fcmToken }).lean() as { province?: string } | null;
 
     if (!device) {
       return NextResponse.json({ error: 'Device not found' }, { status: 404 });
     }
 
-    // Get notifications sent to this device's province or province not set
     const deviceProvince = device.province || '';
     
-    const query = {
+    // Fetch notifications for this province - newest first
+    const notifications = await Notification.find({
       status: 'sent',
       $or: [
         { targetProvince: 'All' },
@@ -35,16 +31,14 @@ export async function GET(request: NextRequest) {
         { targetProvince: { $exists: false } },
         { targetProvince: '' }
       ]
-    };
-
-    const notifications = await Notification.find(query)
+    })
       .sort({ createdAt: -1 })
       .limit(50)
-      .select('title message imageUrl link createdAt');
+      .lean();
 
     return NextResponse.json({
       notifications: notifications.map(n => ({
-        id: n._id,
+        id: n._id?.toString(),
         title: n.title,
         message: n.message,
         image: n.imageUrl,
