@@ -20,16 +20,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Device not found' }, { status: 404 });
     }
 
-    const deviceProvince = device.province || '';
+    const deviceProvince = device.province;
     
-    // Fetch notifications for this province - newest first
+    // Only show messages sent to the device's province or "All"
+    // Don't show messages with empty/undefined province
     const notifications = await Notification.find({
       status: 'sent',
       $or: [
         { targetProvince: 'All' },
-        { targetProvince: deviceProvince },
-        { targetProvince: { $exists: false } },
-        { targetProvince: '' }
+        { targetProvince: deviceProvince }
       ]
     })
       .sort({ createdAt: -1 })
