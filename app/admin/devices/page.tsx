@@ -4,19 +4,12 @@ import { useState, useEffect } from 'react';
 
 interface Device {
   _id: string;
+  fcmToken: string;
   province: string;
-  deviceInfo: {
-    platform: string;
-    browser: string;
-    userAgent: string;
-    language: string;
-  };
-  metadata: {
-    appVersion?: string;
-    lastSeen: string;
-    createdAt: string;
-    isActive: boolean;
-  };
+  platform: string;
+  browser: string;
+  userAgent: string;
+  createdAt: string;
 }
 
 interface Stats {
@@ -383,27 +376,27 @@ export default function DevicesPage() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <span className="text-xl" title={device.deviceInfo.platform}>
-                            {getPlatformIcon(device.deviceInfo.platform)}
+                          <span className="text-xl" title={device.platform}>
+                            {getPlatformIcon(device.platform)}
                           </span>
                           <span className="text-sm font-medium text-gray-900 capitalize">
-                            {device.deviceInfo.platform}
+                            {device.platform}
                           </span>
                         </div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <span className="text-xl" title={device.deviceInfo.browser}>
-                            {getBrowserIcon(device.deviceInfo.browser)}
+                          <span className="text-xl" title={device.browser}>
+                            {getBrowserIcon(device.browser)}
                           </span>
                           <span className="text-sm text-gray-600 capitalize">
-                            {device.deviceInfo.browser}
+                            {device.browser}
                           </span>
                         </div>
                       </td>
                       <td className="px-6 py-4">
                         <span className="text-sm text-gray-600">
-                          {device.deviceInfo.language || '-'}
+                          -
                         </span>
                       </td>
                       <td className="px-6 py-4">
@@ -412,23 +405,19 @@ export default function DevicesPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
-                          device.metadata.isActive
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-gray-100 text-gray-600'
-                        }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${device.metadata.isActive ? 'bg-green-500' : 'bg-gray-400'}`}></span>
-                          {device.metadata.isActive ? 'Active' : 'Inactive'}
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                          <span className="w-1.5 h-1.5 rounded-full mr-1.5 bg-green-500"></span>
+                          Active
                         </span>
                       </td>
                       <td className="px-6 py-4">
                         <span className="text-sm text-gray-500">
-                          {formatDate(device.metadata.createdAt)}
+                          {formatDate(device.createdAt)}
                         </span>
                       </td>
                       <td className="px-6 py-4">
                         <span className="text-sm text-gray-500">
-                          {formatDate(device.metadata.lastSeen)}
+                          {formatDate(device.createdAt)}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right">
