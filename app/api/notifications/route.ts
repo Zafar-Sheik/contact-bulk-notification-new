@@ -24,9 +24,9 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const limit = Math.min(parseInt(searchParams.get('limit') || '3'), 10);
 
-    // Fetch latest sent notifications
+    // Fetch latest sent notifications - newest first
     const notifications = await Notification.find({ status: 'sent' })
-      .sort({ sentAt: -1, createdAt: -1 })
+      .sort({ createdAt: -1 })
       .limit(limit)
       .lean();
 
