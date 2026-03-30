@@ -144,25 +144,25 @@ export async function sendNotificationToAllDevices(
     fcmImageUrl = imageUrl;
   }
 
-  // Build data payload - DATA ONLY (no notification object)
-  // This gives us full control over notification display on all platforms
+  // Build notification payload - use both notification and data for immediate delivery
+  // notification object = immediate display by FCM
+  // data object = for handling in app/service worker
   const dataPayload: Record<string, string> = {
     title: title,
     body: body,
     image: fcmImageUrl || '',
     link: link || '/',
-    foreground: 'false',
+    notificationId: notificationId || '',
   };
-  if (notificationId) {
-    dataPayload.notificationId = notificationId;
-  }
 
   const message: FCMMessage = {
-    // Use data payload only - let service worker handle all notification display
-    // This prevents duplicate notifications on both iOS and Android
+    // Use both notification (immediate display) and data (for app handling)
+    notification: {
+      title: title,
+      body: body,
+    },
     data: dataPayload,
     webpush: {
-      // Set high urgency for Android when app is closed
       headers: {
         Urgency: 'high',
       },

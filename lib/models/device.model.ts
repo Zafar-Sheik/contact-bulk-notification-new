@@ -1,143 +1,44 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
-/**
- * Device Interface - Unified model for device registration and notification sending
- */
 export interface IDevice extends Document {
-  deviceId?: string;
   fcmToken: string;
-  fcmTokens?: string[]; // Array of additional FCM tokens (for PWA/browser duplicates)
-  province: 'Gauteng' | 'KwaZulu-Natal' | 'Western Cape' | 'Eastern Cape' | 'Free State' | 'Limpopo' | 'Mpumalanga' | 'North West' | 'Northern Cape' | 'unknown';
-  deviceInfo: {
-    platform: 'android' | 'ios' | 'windows' | 'mac' | 'linux' | 'unknown';
-    browser: string;
-    userAgent: string;
-    language: string;
-  };
-  metadata: {
-    isActive: boolean;
-    lastSeen: Date;
-    createdAt: Date;
-    appVersion?: string;
-  };
-  receivedNotifications: Array<{
-    notificationId: string;
-    title: string;
-    message: string;
-    image?: string;
-    link?: string;
-    receivedAt: Date;
-    read: boolean;
-  }>;
+  province: string;
+  platform: string;
+  browser: string;
+  userAgent: string;
   createdAt: Date;
-  updatedAt: Date;
 }
 
 const DeviceSchema = new Schema<IDevice>(
   {
-    deviceId: {
-      type: String,
-      unique: true,
-      sparse: true, // Allows null values for existing documents
-    },
     fcmToken: {
       type: String,
-      required: [true, 'FCM token is required'],
+      required: true,
       unique: true,
-    },
-    fcmTokens: {
-      type: [String],
-      default: [],
-      description: 'Additional FCM tokens for the same device (browser/PWA)',
     },
     province: {
       type: String,
-      enum: [
-        'Gauteng',
-        'KwaZulu-Natal',
-        'Western Cape',
-        'Eastern Cape',
-        'Free State',
-        'Limpopo',
-        'Mpumalanga',
-        'North West',
-        'Northern Cape',
-        'unknown',
-      ],
-      default: 'unknown',
+      default: '',
     },
-    deviceInfo: {
-      platform: {
-        type: String,
-        enum: ['android', 'ios', 'windows', 'mac', 'linux', 'unknown'],
-        default: 'unknown',
-      },
-      browser: {
-        type: String,
-        default: 'unknown',
-      },
-      userAgent: {
-        type: String,
-        default: '',
-      },
-      language: {
-        type: String,
-        default: 'en',
-      },
+    platform: {
+      type: String,
+      default: '',
     },
-    metadata: {
-      isActive: {
-        type: Boolean,
-        default: true,
-      },
-      lastSeen: {
-        type: Date,
-        default: Date.now,
-      },
-      createdAt: {
-        type: Date,
-        default: Date.now,
-      },
-      appVersion: {
-        type: String,
-      },
+    browser: {
+      type: String,
+      default: '',
     },
-    receivedNotifications: {
-      type: [{
-        notificationId: { type: String, required: true },
-        title: { type: String, required: true },
-        message: { type: String, required: true },
-        image: { type: String, default: '' },
-        link: { type: String, default: '' },
-        receivedAt: { type: Date, default: Date.now },
-        read: { type: Boolean, default: false },
-      }],
-      default: [],
+    userAgent: {
+      type: String,
+      default: '',
     },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
-// Indexes for efficient queries
-DeviceSchema.index({ deviceId: 1 });
-DeviceSchema.index({ province: 1 });
-DeviceSchema.index({ 'deviceInfo.platform': 1 });
-DeviceSchema.index({ 'deviceInfo.browser': 1 });
-DeviceSchema.index({ 'metadata.isActive': 1 });
-DeviceSchema.index({ 'metadata.lastSeen': -1 });
 DeviceSchema.index({ fcmToken: 1 });
+DeviceSchema.index({ province: 1 });
 
-// Update lastSeen before save
-DeviceSchema.pre('save', function (next) {
-  if (this.isModified()) {
-    this.metadata.lastSeen = new Date();
-  }
-  next();
-});
-
-// Prevent model overwrite in development
 const Device = mongoose.models.Device || mongoose.model<IDevice>('Device', DeviceSchema);
 
 export default Device;

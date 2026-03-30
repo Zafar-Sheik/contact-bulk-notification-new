@@ -1,7 +1,6 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { v4 as uuidv4 } from 'uuid';
 import { 
   initFirebase, 
   requestNotificationPermission,
@@ -11,50 +10,34 @@ import {
   getNotificationPermission
 } from '@/lib/firebase/client';
 
-interface DeviceInfo {
-  browser: string;
-  platform: 'android' | 'ios' | 'windows' | 'mac' | 'linux' | 'unknown';
-  os: string;
-  userAgent: string;
-}
-
-function parseUserAgent(userAgent: string): DeviceInfo {
+function parseUserAgent(userAgent: string) {
   const ua = userAgent.toLowerCase();
-  
-  let platform: DeviceInfo['platform'] = 'unknown';
-  let browser = 'unknown';
-  let os = '';
+  let platform = '';
+  let browser = '';
   
   if (ua.includes('android')) {
     platform = 'android';
-    os = 'Android';
   } else if (ua.includes('iphone') || ua.includes('ipad')) {
     platform = 'ios';
-    os = ua.includes('ipad') ? 'iPadOS' : 'iOS';
   } else if (ua.includes('windows')) {
     platform = 'windows';
-    os = 'Windows';
   } else if (ua.includes('mac')) {
     platform = 'mac';
-    os = 'macOS';
   } else if (ua.includes('linux')) {
     platform = 'linux';
-    os = 'Linux';
   }
   
   if (ua.includes('chrome')) {
     browser = 'Chrome';
-  } else if (ua.includes('firefox')) {
-    browser = 'Firefox';
   } else if (ua.includes('safari')) {
     browser = 'Safari';
+  } else if (ua.includes('firefox')) {
+    browser = 'Firefox';
   } else if (ua.includes('edge')) {
     browser = 'Edge';
-  } else if (ua.includes('opera')) {
-    browser = 'Opera';
   }
   
-  return { platform, browser, os, userAgent };
+  return { platform, browser };
 }
 
 interface PWAContextType {
@@ -77,11 +60,7 @@ export function usePWA() {
   return context;
 }
 
-interface PWAProviderProps {
-  children: ReactNode;
-}
-
-export function PWAProvider({ children }: PWAProviderProps) {
+export function PWAProvider({ children }: { children: ReactNode }) {
   const [isReady, setIsReady] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
   const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>('unsupported');
@@ -90,199 +69,18 @@ export function PWAProvider({ children }: PWAProviderProps) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check if notifications are supported
     const supported = isNotificationsSupported();
     setIsSupported(supported);
-    
     if (supported) {
       setPermission(getNotificationPermission());
     }
-
-    // Initialize Firebase
     initFirebase();
     setIsReady(true);
   }, []);
 
-  // Auto-register device on mount if permission is granted
-  useEffect(() => {
-    if (!isReady || !isSupported) return;
-    
-    // Check if device is already registered and get stored token
-    const isRegistered = localStorage.getItem('deviceRegistered');
-    const storedToken = localStorage.getItem('fcmToken');
-    
-    // Auto-register if permission was already granted
-    const autoRegister = async () => {
-      if (permission === 'granted' && !token) {
-        try {
-          setIsRegistering(true);
-          const fcmToken = await getFcmToken();
-          
-          if (fcmToken) {
-            // Check if token has changed or not registered yet
-            const shouldRegister = !isRegistered || fcmToken !== storedToken;
-            
-            if (shouldRegister) {
-              setToken(fcmToken);
-              
-              // Get or generate device ID
-              let deviceId = localStorage.getItem('deviceId');
-              if (!deviceId) {
-                deviceId = uuidv4();
-                localStorage.setItem('deviceId', deviceId);
-              }
-              
-              // Get province from localStorage if available
-              const savedProvince = localStorage.getItem('userProvince') || undefined;
-              
-              // Get device info including platform
-              const userAgent = typeof window !== 'undefined' ? navigator.userAgent : '';
-              const deviceInfo = parseUserAgent(userAgent);
-              
-              const response = await fetch('/api/device/register', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                  fcmToken, 
-                  province: savedProvince,
-                  deviceInfo: {
-                    deviceId,
-                    platform: deviceInfo.platform,
-                    browser: deviceInfo.browser,
-                    userAgent: userAgent,
-                    language: 'en',
-                  }
-                }),
-              });
-
-              if (response.ok) {
-                const data = await response.json();
-                console.log('Device auto-registered:', data);
-                // Mark as registered and store token in localStorage
-                localStorage.setItem('deviceRegistered', 'true');
-                localStorage.setItem('fcmToken', fcmToken);
-              }
-            } else {
-              // Token hasn't changed and already registered, just set the token
-              setToken(fcmToken);
-            }
-          }
-        } catch (err) {
-          console.error('Auto-registration error:', err);
-        } finally {
-          setIsRegistering(false);
-        }
-      }
-    };
-
-    autoRegister();
-  }, [isReady, isSupported, permission, token]);
-
-  // Auto-request notification permission on first install
-  useEffect(() => {
-    if (!isReady || !isSupported) return;
-    
-    // Check if this is the first time the user is visiting
-    const hasRequestedPermission = localStorage.getItem('permissionRequested');
-    const isRegistered = localStorage.getItem('deviceRegistered');
-    
-    // Auto-request permission if never requested and not registered
-    if (!hasRequestedPermission && !isRegistered && permission !== 'denied' && permission !== 'granted') {
-      const requestPermission = async () => {
-        try {
-          setIsRegistering(true);
-          localStorage.setItem('permissionRequested', 'true');
-          
-          // Request permission from browser
-          const newPermission = await requestNotificationPermission();
-          setPermission(newPermission);
-          
-          if (newPermission === 'granted') {
-            // Get FCM token after permission is granted
-            const fcmToken = await getFcmToken();
-            
-            if (fcmToken) {
-              setToken(fcmToken);
-              
-              // Get or generate device ID
-              let deviceId = localStorage.getItem('deviceId');
-              if (!deviceId) {
-                deviceId = uuidv4();
-                localStorage.setItem('deviceId', deviceId);
-              }
-              
-              // Get province from localStorage if available
-              const savedProvince = localStorage.getItem('userProvince') || undefined;
-              
-              // Get device info including platform
-              const userAgent = typeof window !== 'undefined' ? navigator.userAgent : '';
-              const deviceInfo = parseUserAgent(userAgent);
-              
-              // Register device with backend
-              const response = await fetch('/api/device/register', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                  fcmToken, 
-                  province: savedProvince,
-                  deviceInfo: {
-                    deviceId,
-                    platform: deviceInfo.platform,
-                    browser: deviceInfo.browser,
-                    userAgent: userAgent,
-                    language: 'en',
-                  }
-                }),
-              });
-
-              if (response.ok) {
-                const data = await response.json();
-                console.log('Device auto-registered on first visit:', data);
-                localStorage.setItem('deviceRegistered', 'true');
-                localStorage.setItem('fcmToken', fcmToken);
-              }
-            }
-          }
-        } catch (err) {
-          console.error('Auto permission request error:', err);
-        } finally {
-          setIsRegistering(false);
-        }
-      };
-
-      // Delay the request slightly to ensure the UI is ready
-      requestPermission();
-    }
-  }, [isReady, isSupported, permission]);
-
-  // Listen for foreground messages - don't show duplicate notifications on iOS
-  // Firebase SDK handles foreground notifications natively on iOS
-  useEffect(() => {
-    if (!isReady || !isSupported) return;
-
-    const unsubscribe = onForegroundMessage((payload) => {
-      // On iOS, Firebase SDK handles foreground notifications automatically
-      // We only log here - do NOT show manual notifications to prevent duplicates
-      console.log('[FCM] Foreground message received:', payload);
-      
-      // Handle any data-only messages if needed
-      const payloadObj = payload as { notification?: { title?: string; body?: string }; data?: Record<string, unknown> };
-      
-      // Only handle data-only messages (no notification object)
-      if (!payloadObj.notification || (!payloadObj.notification.title && !payloadObj.notification.body)) {
-        // This is a data-only message, you could handle it here if needed
-        console.log('[FCM] Data-only foreground message received');
-      }
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [isReady, isSupported]);
-
   const registerDevice = async (province?: string) => {
     if (!isSupported) {
-      setError('Notifications are not supported on this device');
+      setError('Notifications not supported');
       return;
     }
 
@@ -290,74 +88,61 @@ export function PWAProvider({ children }: PWAProviderProps) {
     setError(null);
 
     try {
-      // Request permission from browser
-      const permission = await requestNotificationPermission();
-      setPermission(permission);
+      const perm = await requestNotificationPermission();
+      setPermission(perm);
       
-      if (permission !== 'granted') {
-        setError('Notification permission denied');
+      if (perm !== 'granted') {
+        setError('Permission denied');
         setIsRegistering(false);
         return;
       }
 
-      // Get FCM token after permission is granted
       const fcmToken = await getFcmToken();
       
       if (fcmToken) {
         setToken(fcmToken);
         
-        // Get or generate device ID
-        let deviceId = localStorage.getItem('deviceId');
-        if (!deviceId) {
-          deviceId = uuidv4();
-          localStorage.setItem('deviceId', deviceId);
-        }
-        
-        // Get device info including platform
         const userAgent = typeof window !== 'undefined' ? navigator.userAgent : '';
         const deviceInfo = parseUserAgent(userAgent);
         
-        // Register device with backend
         const response = await fetch('/api/device/register', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             fcmToken,
             province,
-            deviceInfo: {
-              deviceId,
-              platform: deviceInfo.platform,
-              browser: deviceInfo.browser,
-              userAgent: userAgent,
-              language: 'en',
-            },
+            platform: deviceInfo.platform,
+            browser: deviceInfo.browser,
+            userAgent,
           }),
         });
 
-        if (!response.ok) {
-          throw new Error('Failed to register device');
-        }
-
-        const data = await response.json();
-        console.log('Device registered:', data);
-        // Mark as registered and store token in localStorage
-        localStorage.setItem('deviceRegistered', 'true');
-        localStorage.setItem('fcmToken', fcmToken);
-        
-        // Store province in localStorage if provided
-        if (province) {
-          localStorage.setItem('userProvince', province);
+        if (response.ok) {
+          localStorage.setItem('deviceRegistered', 'true');
+          localStorage.setItem('fcmToken', fcmToken);
+          if (province) {
+            localStorage.setItem('userProvince', province);
+          }
+        } else {
+          throw new Error('Failed to register');
         }
       }
     } catch (err) {
-      console.error('Error registering device:', err);
-      setError(err instanceof Error ? err.message : 'Failed to register device');
+      setError(err instanceof Error ? err.message : 'Registration failed');
     } finally {
       setIsRegistering(false);
     }
   };
+
+  useEffect(() => {
+    if (!isReady || !isSupported) return;
+
+    const unsubscribe = onForegroundMessage((payload) => {
+      console.log('FCM message:', payload);
+    });
+
+    return () => { unsubscribe(); };
+  }, [isReady, isSupported]);
 
   return (
     <PWAContext.Provider

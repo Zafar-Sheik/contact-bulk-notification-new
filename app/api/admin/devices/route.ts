@@ -44,10 +44,22 @@ export async function GET(request: NextRequest) {
       .select('-fcmToken'); // Exclude FCM tokens from response for security
 
     // Get statistics
+    // Include devices without metadata as active for backwards compatibility
+    const activeQuery = {
+      $or: [
+        { 'metadata.isActive': true },
+        { metadata: { $exists: false } },
+        { metadata: null }
+      ]
+    };
+    const inactiveQuery = {
+      'metadata.isActive': false,
+      metadata: { $exists: true, $ne: null }
+    };
     const stats = {
       total,
-      active: await Device.countDocuments({ 'metadata.isActive': true }),
-      inactive: await Device.countDocuments({ 'metadata.isActive': false }),
+      active: await Device.countDocuments(activeQuery),
+      inactive: await Device.countDocuments(inactiveQuery),
       byPlatform: await Device.aggregate([
         { $group: { _id: '$deviceInfo.platform', count: { $sum: 1 } } },
       ]),

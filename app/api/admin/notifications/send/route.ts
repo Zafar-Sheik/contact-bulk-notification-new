@@ -55,18 +55,19 @@ export async function POST(request: NextRequest) {
     // Get all active device tokens (including additional tokens in fcmTokens array)
     console.log('Fetching active devices...');
     
-    // Build query based on targetProvince
-    const deviceQuery: Record<string, unknown> = { 'metadata.isActive': true };
+    // Get all devices - include devices without metadata as active for backwards compatibility
+    let deviceQuery: Record<string, unknown> = {};
     
     // Filter by province if specified (and not "All")
-    // Include devices with the specified province OR devices with no province (unknown)
     if (targetProvince && targetProvince !== 'All') {
-      deviceQuery.$or = [
-        { province: targetProvince },
-        { province: { $exists: false } },
-        { province: null },
-        { province: 'unknown' }
-      ];
+      deviceQuery = {
+        $or: [
+          { province: targetProvince },
+          { province: { $exists: false } },
+          { province: null },
+          { province: 'unknown' }
+        ]
+      };
     }
     
     const devices = await Device.find(deviceQuery).lean().select('fcmToken fcmTokens province') as { fcmToken: string; fcmTokens?: string[]; province?: string }[];
