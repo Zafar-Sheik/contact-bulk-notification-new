@@ -68,25 +68,6 @@ export function PWAProvider({ children }: { children: ReactNode }) {
   const [isRegistering, setIsRegistering] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const supported = isNotificationsSupported();
-    setIsSupported(supported);
-    if (supported) {
-      setPermission(getNotificationPermission());
-    }
-    initFirebase();
-    setIsReady(true);
-
-    // Auto-register if already registered before
-    const checkAndRegister = async () => {
-      const storedToken = localStorage.getItem('fcmToken');
-      if (storedToken && permission === 'granted') {
-        setToken(storedToken);
-      }
-    };
-    checkAndRegister();
-  }, []);
-
   const registerDevice = async (province?: string) => {
     if (!isSupported) {
       setError('Notifications not supported');
@@ -97,16 +78,15 @@ export function PWAProvider({ children }: { children: ReactNode }) {
     setError(null);
 
     try {
-      // Check if already registered
-      const storedToken = localStorage.getItem('fcmToken');
-      const perm = await getNotificationPermission();
+      // Get current permission
+      let perm = getNotificationPermission() as NotificationPermission;
       setPermission(perm);
       
       if (perm !== 'granted') {
-        const newPerm = await requestNotificationPermission();
-        setPermission(newPerm);
+        perm = await requestNotificationPermission();
+        setPermission(perm);
         
-        if (newPerm !== 'granted') {
+        if (perm !== 'granted') {
           setError('Permission denied');
           setIsRegistering(false);
           return;
@@ -139,8 +119,6 @@ export function PWAProvider({ children }: { children: ReactNode }) {
           if (province) {
             localStorage.setItem('userProvince', province);
           }
-        } else {
-          throw new Error('Failed to register');
         }
       }
     } catch (err) {
@@ -149,6 +127,44 @@ export function PWAProvider({ children }: { children: ReactNode }) {
       setIsRegistering(false);
     }
   };
+
+  useEffect(() => {
+    const init = async () => {
+      const supported = isNotificationsSupported();
+      setIsSupported(supported);
+      
+      if (supported) {
+        const perm = getNotificationPermission() as NotificationPermission;
+        setPermission(perm);
+        
+        // If permission granted, restore token or get new one
+        if (perm === 'granted') {
+          const storedToken = localStorage.getItem('fcmToken');
+          if (storedToken) {
+            setToken(storedToken);
+          } else {
+            // Get fresh token
+            try {
+              initFirebase();
+              const newToken = await getFcmToken();
+              if (newToken) {
+                setToken(newToken);
+                localStorage.setItem('fcmToken', newToken);
+                localStorage.setItem('deviceRegistered', 'true');
+              }
+            } catch (e) {
+              console.error('Error getting token:', e);
+            }
+          }
+        }
+      }
+      
+      initFirebase();
+      setIsReady(true);
+    };
+    
+    init();
+  }, []);
 
   useEffect(() => {
     if (!isReady || !isSupported) return;
