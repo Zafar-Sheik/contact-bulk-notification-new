@@ -71,7 +71,7 @@ export default function NotificationModal({ isOpen, onClose, notification }: Not
         />
 
         {/* Modal Content */}
-        <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden modal-content">
+        <div className="relative w-full max-w-lg max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden modal-content flex flex-col">
           {/* Header Gradient */}
           <div className="h-3 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
 
@@ -86,8 +86,8 @@ export default function NotificationModal({ isOpen, onClose, notification }: Not
             </svg>
           </button>
 
-          {/* Content */}
-          <div className="p-6">
+          {/* Content - scrollable */}
+          <div className="p-6 overflow-y-auto flex-1">
             {/* Title */}
             <h2 
               id="modal-title" 
