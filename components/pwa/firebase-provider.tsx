@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import { 
   initFirebase, 
   requestNotificationPermission,
@@ -9,6 +10,52 @@ import {
   isNotificationsSupported,
   getNotificationPermission
 } from '@/lib/firebase/client';
+
+interface DeviceInfo {
+  browser: string;
+  platform: 'android' | 'ios' | 'windows' | 'mac' | 'linux' | 'unknown';
+  os: string;
+  userAgent: string;
+}
+
+function parseUserAgent(userAgent: string): DeviceInfo {
+  const ua = userAgent.toLowerCase();
+  
+  let platform: DeviceInfo['platform'] = 'unknown';
+  let browser = 'unknown';
+  let os = '';
+  
+  if (ua.includes('android')) {
+    platform = 'android';
+    os = 'Android';
+  } else if (ua.includes('iphone') || ua.includes('ipad')) {
+    platform = 'ios';
+    os = ua.includes('ipad') ? 'iPadOS' : 'iOS';
+  } else if (ua.includes('windows')) {
+    platform = 'windows';
+    os = 'Windows';
+  } else if (ua.includes('mac')) {
+    platform = 'mac';
+    os = 'macOS';
+  } else if (ua.includes('linux')) {
+    platform = 'linux';
+    os = 'Linux';
+  }
+  
+  if (ua.includes('chrome')) {
+    browser = 'Chrome';
+  } else if (ua.includes('firefox')) {
+    browser = 'Firefox';
+  } else if (ua.includes('safari')) {
+    browser = 'Safari';
+  } else if (ua.includes('edge')) {
+    browser = 'Edge';
+  } else if (ua.includes('opera')) {
+    browser = 'Opera';
+  }
+  
+  return { platform, browser, os, userAgent };
+}
 
 interface PWAContextType {
   isReady: boolean;
@@ -78,13 +125,34 @@ export function PWAProvider({ children }: PWAProviderProps) {
             if (shouldRegister) {
               setToken(fcmToken);
               
+              // Get or generate device ID
+              let deviceId = localStorage.getItem('deviceId');
+              if (!deviceId) {
+                deviceId = uuidv4();
+                localStorage.setItem('deviceId', deviceId);
+              }
+              
               // Get province from localStorage if available
               const savedProvince = localStorage.getItem('userProvince') || undefined;
+              
+              // Get device info including platform
+              const userAgent = typeof window !== 'undefined' ? navigator.userAgent : '';
+              const deviceInfo = parseUserAgent(userAgent);
               
               const response = await fetch('/api/device/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ fcmToken, province: savedProvince }),
+                body: JSON.stringify({ 
+                  fcmToken, 
+                  province: savedProvince,
+                  deviceInfo: {
+                    deviceId,
+                    platform: deviceInfo.platform,
+                    browser: deviceInfo.browser,
+                    userAgent: userAgent,
+                    language: 'en',
+                  }
+                }),
               });
 
               if (response.ok) {
@@ -136,14 +204,35 @@ export function PWAProvider({ children }: PWAProviderProps) {
             if (fcmToken) {
               setToken(fcmToken);
               
+              // Get or generate device ID
+              let deviceId = localStorage.getItem('deviceId');
+              if (!deviceId) {
+                deviceId = uuidv4();
+                localStorage.setItem('deviceId', deviceId);
+              }
+              
               // Get province from localStorage if available
               const savedProvince = localStorage.getItem('userProvince') || undefined;
+              
+              // Get device info including platform
+              const userAgent = typeof window !== 'undefined' ? navigator.userAgent : '';
+              const deviceInfo = parseUserAgent(userAgent);
               
               // Register device with backend
               const response = await fetch('/api/device/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ fcmToken, province: savedProvince }),
+                body: JSON.stringify({ 
+                  fcmToken, 
+                  province: savedProvince,
+                  deviceInfo: {
+                    deviceId,
+                    platform: deviceInfo.platform,
+                    browser: deviceInfo.browser,
+                    userAgent: userAgent,
+                    language: 'en',
+                  }
+                }),
               });
 
               if (response.ok) {
@@ -217,6 +306,17 @@ export function PWAProvider({ children }: PWAProviderProps) {
       if (fcmToken) {
         setToken(fcmToken);
         
+        // Get or generate device ID
+        let deviceId = localStorage.getItem('deviceId');
+        if (!deviceId) {
+          deviceId = uuidv4();
+          localStorage.setItem('deviceId', deviceId);
+        }
+        
+        // Get device info including platform
+        const userAgent = typeof window !== 'undefined' ? navigator.userAgent : '';
+        const deviceInfo = parseUserAgent(userAgent);
+        
         // Register device with backend
         const response = await fetch('/api/device/register', {
           method: 'POST',
@@ -226,6 +326,13 @@ export function PWAProvider({ children }: PWAProviderProps) {
           body: JSON.stringify({
             fcmToken,
             province,
+            deviceInfo: {
+              deviceId,
+              platform: deviceInfo.platform,
+              browser: deviceInfo.browser,
+              userAgent: userAgent,
+              language: 'en',
+            },
           }),
         });
 
