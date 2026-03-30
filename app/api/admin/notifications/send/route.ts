@@ -161,44 +161,44 @@ export async function POST(request: NextRequest) {
       { $push: { receivedNotifications: notificationEntry } }
     );
 
-    // Clean up invalid tokens
+    // Mark inactive devices instead of deleting
+    const inactiveTokens: string[] = [];
     if (result.errors && result.errors.length > 0) {
-      const invalidTokens = result.errors
-        .filter(e => e.error.includes('NOT_FOUND') || e.error.includes('NotRegistered') || e.error.includes('Invalid'))
-        .map(e => tokens[e.index]);
+      result.errors.forEach((e) => {
+        if (e.error.includes('NOT_FOUND') || e.error.includes('NotRegistered') || e.error.includes('Invalid')) {
+          const token = tokens[e.index];
+          if (token) inactiveTokens.push(token);
+        }
+      });
       
-      console.log('Cleaning up', invalidTokens.length, 'invalid tokens');
-      if (invalidTokens.length > 0) {
-        // For each invalid token, either remove it from fcmTokens array or delete the device
-        for (const invalidToken of invalidTokens) {
-          // Try to find device with this as primary token
+      if (inactiveTokens.length > 0) {
+        console.log('Marking', inactiveTokens.length, 'devices as inactive');
+        // For each invalid token, check if device has additional tokens
+        for (const invalidToken of inactiveTokens) {
           const device = await Device.findOne({ fcmToken: invalidToken });
           if (device) {
-            // Check if device has additional tokens
             if (device.fcmTokens && device.fcmTokens.length > 0) {
-              // Promote an additional token to primary and remove invalid
-              const validToken = device.fcmTokens?.find((t: string) => t !== invalidToken);
+              const validToken = device.fcmTokens.find((t: string) => t !== invalidToken);
               if (validToken) {
                 device.fcmToken = validToken;
-                device.fcmTokens = device.fcmTokens?.filter((t: string) => t !== invalidToken && t !== validToken);
+                device.fcmTokens = device.fcmTokens.filter((t: string) => t !== invalidToken && t !== validToken);
+                device.metadata.lastSeen = new Date();
                 await device.save();
               } else {
-                // No valid tokens left, delete device
-                await Device.deleteOne({ _id: device._id });
+                device.metadata.isActive = false;
+                await device.save();
               }
             } else {
-              // No additional tokens, delete device
-              await Device.deleteOne({ _id: device._id });
+              device.metadata.isActive = false;
+              await device.save();
             }
-          } else {
-            // Token might be in fcmTokens array of another device
-            await Device.updateOne(
-              { fcmTokens: invalidToken },
-              { $pull: { fcmTokens: invalidToken } }
-            );
           }
         }
-        console.log('Cleaned up invalid tokens');
+        // Also update any devices where token is in fcmTokens array
+        await Device.updateMany(
+          { fcmTokens: { $in: inactiveTokens } },
+          { $set: { 'metadata.isActive': false } }
+        );
       }
     }
 

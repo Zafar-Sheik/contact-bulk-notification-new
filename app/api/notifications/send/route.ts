@@ -137,15 +137,22 @@ export async function POST(request: NextRequest) {
 
     await notification.save();
 
-    // Clean up invalid tokens
+    // Mark inactive devices instead of deleting
+    const inactiveTokens: string[] = [];
     if (result.errors && result.errors.length > 0) {
-      const invalidTokens = result.errors
-        .filter(e => e.error.includes('NOT_FOUND') || e.error.includes('Invalid') || e.error.includes('NotRegistered'))
-        .map(e => tokens[e.index]);
+      result.errors.forEach((e) => {
+        if (e.error.includes('NOT_FOUND') || e.error.includes('Invalid') || e.error.includes('NotRegistered')) {
+          const token = tokens[e.index];
+          if (token) inactiveTokens.push(token);
+        }
+      });
       
-      if (invalidTokens.length > 0) {
-        console.log('Cleaning up', invalidTokens.length, 'invalid tokens');
-        await Device.deleteMany({ fcmToken: { $in: invalidTokens } });
+      if (inactiveTokens.length > 0) {
+        console.log('Marking', inactiveTokens.length, 'devices as inactive');
+        await Device.updateMany(
+          { fcmToken: { $in: inactiveTokens } },
+          { $set: { 'metadata.isActive': false } }
+        );
       }
     }
 

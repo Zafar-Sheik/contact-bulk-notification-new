@@ -123,9 +123,13 @@ export async function POST(request: NextRequest) {
           isActive: true,
         };
       } else {
-        // Update existing metadata
+        // ALWAYS set isActive to true for any device that registers
+        // This ensures devices don't become inactive unexpectedly
+        if (existingDevice.metadata.isActive === false) {
+          existingDevice.metadata.isActive = true;
+        }
+        // Update lastSeen
         existingDevice.metadata.lastSeen = new Date();
-        existingDevice.metadata.isActive = true;
         if ((deviceInfo as { appVersion?: string })?.appVersion) {
           existingDevice.metadata.appVersion = (deviceInfo as { appVersion?: string }).appVersion;
         }
