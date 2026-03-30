@@ -11,7 +11,7 @@ import {
 } from '@/lib/firebase/client';
 
 function parseUserAgent(userAgent: string) {
-  const ua = userAgent.toLowerCase();
+  const ua = (userAgent || '').toLowerCase();
   let platform = '';
   let browser = '';
   
