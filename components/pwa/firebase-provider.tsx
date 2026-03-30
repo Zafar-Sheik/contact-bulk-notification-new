@@ -76,6 +76,15 @@ export function PWAProvider({ children }: { children: ReactNode }) {
     }
     initFirebase();
     setIsReady(true);
+
+    // Auto-register if already registered before
+    const checkAndRegister = async () => {
+      const storedToken = localStorage.getItem('fcmToken');
+      if (storedToken && permission === 'granted') {
+        setToken(storedToken);
+      }
+    };
+    checkAndRegister();
   }, []);
 
   const registerDevice = async (province?: string) => {
@@ -88,13 +97,20 @@ export function PWAProvider({ children }: { children: ReactNode }) {
     setError(null);
 
     try {
-      const perm = await requestNotificationPermission();
+      // Check if already registered
+      const storedToken = localStorage.getItem('fcmToken');
+      const perm = await getNotificationPermission();
       setPermission(perm);
       
       if (perm !== 'granted') {
-        setError('Permission denied');
-        setIsRegistering(false);
-        return;
+        const newPerm = await requestNotificationPermission();
+        setPermission(newPerm);
+        
+        if (newPerm !== 'granted') {
+          setError('Permission denied');
+          setIsRegistering(false);
+          return;
+        }
       }
 
       const fcmToken = await getFcmToken();
